@@ -1,0 +1,20 @@
+{
+  "name": "branchwork",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An open-source spatial writing and research environment. Nonlinear thinking upstream; linear writing downstream; provenance preserved throughout.",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}
