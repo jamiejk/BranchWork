@@ -108,33 +108,29 @@ function ResearchNodeShellInner({ data }: NodeProps) {
     if (state.editingNodeId !== card.nodeId) return;
     const value = textareaRef.current?.value ?? "";
     const node = state.nodes[card.nodeId];
-    const patch: { content: string } = { content: value };
-    if (node && node.content === value) {
+
+    // Title is always filled immediately from the first line so the card
+    // never looks blank; the background model may replace it with a better
+    // one shortly after.
+    const nextTitle = value.split("\n")[0]?.slice(0, 110) || "";
+    let content = value;
+    if (nextTitle && content.startsWith(nextTitle)) {
+      content = content.slice(nextTitle.length).replace(/^\s+/, "");
+    }
+
+    if (node && node.title === nextTitle && node.content === content) {
       state.setEditingNode(null);
       return;
     }
-    state.updateNode(card.nodeId, patch);
-    // First capture on an untitled card: the background model proposes a
-    // concise title instead of reusing the start of the body. Offline
-    // (mock-only) sessions fall back to the local first-line heuristic.
-    if (node && !node.title.trim() && value.trim()) {
-      void state.generateTitle(card.nodeId).then(() => {
-        const afterGen = store.getState().nodes[card.nodeId];
-        if (!afterGen || !afterGen.title.trim()) {
-          const fallback = value.split("\n")[0]?.slice(0, 110) || "";
-          const cur = store.getState().nodes[card.nodeId];
-          if (fallback && cur && !cur.title.trim()) {
-            store.getState().updateNode(card.nodeId, { title: fallback });
-            const content = store.getState().nodes[card.nodeId]?.content ?? "";
-            if (content.startsWith(fallback)) {
-              store.getState().updateNode(card.nodeId, { content: content.slice(fallback.length).replace(/^\s+/, "") });
-            }
-          }
-        }
-      });
-    }
+    state.updateNode(card.nodeId, { title: nextTitle, content });
     state.setEditingNode(null);
     state.setSelectedNodes([card.nodeId]);
+
+    // Ask the background model to propose a sharper title (fire-and-forget).
+    // generateTitle only overwrites if the user hasn't edited it meanwhile.
+    if (nextTitle.trim()) {
+      void store.getState().generateTitle(card.nodeId);
+    }
   };
 
   const commitTitle = () => {

@@ -68,13 +68,18 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
       try {
         const s = get();
         const node = s.nodes[nodeId];
-        if (!node || node.title.trim()) return;
+        if (!node || !node.title.trim()) return; // nothing to improve
         if (!extractionConfigured(s.modelSettings)) return;
         const gen = resolveExtraction(s.modelSettings);
         if (!gen) return;
         const adapter = globalRegistry.get(gen.adapterId);
         const source = (node.content || node.plainText).slice(0, 4000);
         if (!source.trim()) return;
+
+        // Remember the placeholder so we don't clobber a manual rename that
+        // happens while the request is in flight.
+        const placeholderTitle = node.title;
+
         const title = await adapter.generateObject({
           providerId: gen.providerId,
           modelId: gen.modelId,
@@ -82,20 +87,22 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
           kind: "title",
           prompt:
             'Write a concise title (3-8 words) that captures the main point of this note. ' +
-            'Respond with JSON: {"title": "..."}. No punctuation at the end.',
+            'Respond with JSON: {"title": "..."}. No punctuation at the end. ' +
+            "Do not simply repeat the first line — summarise the overall idea.",
           payload: { text: source },
           parse: parseGeneratedTitle,
         });
-        // still empty? the user may have typed one meanwhile — respect that
+
         const fresh = get().nodes[nodeId];
-        if (!fresh || fresh.title.trim()) return;
+        if (!fresh || fresh.title !== placeholderTitle) return; // user renamed meanwhile
+
         set((st) => {
           const target = st.nodes[nodeId];
           if (!target) return {};
           return { nodes: { ...st.nodes, [nodeId]: { ...target, title } } };
         });
       } catch {
-        // cosmetic background task — silence is fine
+        // cosmetic background task — the first-line title just stays
       }
     },
   };
