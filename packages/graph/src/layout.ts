@@ -20,11 +20,17 @@ export interface LayoutResult {
   movedNodeIds: NodeId[];
 }
 
+/**
+ * Default card width in px — roughly a comfortable A4 body-text measure
+ * (~65 characters at the card's base font size).
+ */
+export const DEFAULT_CARD_WIDTH = 460;
+
 const DEFAULTS = {
   direction: "TB" as const,
   levelSeparation: 90,
   siblingSeparation: 60,
-  defaultWidth: 260,
+  defaultWidth: DEFAULT_CARD_WIDTH,
   defaultHeight: 120,
 };
 

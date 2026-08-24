@@ -108,20 +108,31 @@ function ResearchNodeShellInner({ data }: NodeProps) {
     if (state.editingNodeId !== card.nodeId) return;
     const value = textareaRef.current?.value ?? "";
     const node = state.nodes[card.nodeId];
-    const patch: { content: string; title?: string } = { content: value };
-    // first capture on an untitled card: derive the title from the first line
-    // (and keep it out of the body) so quick capture stays one-step
-    if (node && !node.title.trim() && value.trim()) {
-      patch.title = value.split("\n")[0]?.slice(0, 110) || "";
-      if (patch.title && patch.content.startsWith(patch.title)) {
-        patch.content = patch.content.slice(patch.title.length).replace(/^\s+/, "");
-      }
-    }
-    if (node && node.title === (patch.title ?? node.title) && node.content === value) {
+    const patch: { content: string } = { content: value };
+    if (node && node.content === value) {
       state.setEditingNode(null);
       return;
     }
     state.updateNode(card.nodeId, patch);
+    // First capture on an untitled card: the background model proposes a
+    // concise title instead of reusing the start of the body. Offline
+    // (mock-only) sessions fall back to the local first-line heuristic.
+    if (node && !node.title.trim() && value.trim()) {
+      void state.generateTitle(card.nodeId).then(() => {
+        const afterGen = store.getState().nodes[card.nodeId];
+        if (!afterGen || !afterGen.title.trim()) {
+          const fallback = value.split("\n")[0]?.slice(0, 110) || "";
+          const cur = store.getState().nodes[card.nodeId];
+          if (fallback && cur && !cur.title.trim()) {
+            store.getState().updateNode(card.nodeId, { title: fallback });
+            const content = store.getState().nodes[card.nodeId]?.content ?? "";
+            if (content.startsWith(fallback)) {
+              store.getState().updateNode(card.nodeId, { content: content.slice(fallback.length).replace(/^\s+/, "") });
+            }
+          }
+        }
+      });
+    }
     state.setEditingNode(null);
     state.setSelectedNodes([card.nodeId]);
   };

@@ -14,7 +14,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import { computeHiddenNodeIds } from "@branchwork/graph";
+import { computeHiddenNodeIds, DEFAULT_CARD_WIDTH } from "@branchwork/graph";
 import { NODE_TYPES, NODE_TYPE_REGISTRY, type EdgeId, type NodeType } from "@branchwork/domain";
 import { useStore } from "../../state/store";
 import { setRfInstance } from "../../lib/rf";
@@ -110,15 +110,12 @@ function CanvasInner() {
             id: node.id,
             type: "research" as const,
             position: node.position,
-            // explicit size only when the user has resized; otherwise the card
-            // auto-sizes from content (default width via CSS)
-            style:
-              node.size
-                ? {
-                    width: node.size.width,
-                    ...(node.size.height ? { height: node.size.height } : {}),
-                  }
-                : undefined,
+            // stable reading measure (~65ch, an A4 text line); height stays
+            // content-driven unless the user has resized
+            style: {
+              width: node.size?.width ?? DEFAULT_CARD_WIDTH,
+              ...(node.size?.height ? { height: node.size.height } : {}),
+            },
             selected: selectedNodeIds.includes(node.id),
             data: data as unknown as Record<string, unknown>,
           };

@@ -49,6 +49,8 @@ const runControllers = new Map<string, AbortController>();
 export interface ModelRunActions {
   runExploration: () => Promise<void>;
   cancelRun: (runId: string) => void;
+  /** Ask the background model for a concise title (used on first capture). */
+  generateTitle: (nodeId: NodeId) => Promise<void>;
 }
 
 export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
@@ -60,7 +62,53 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
     cancelRun(runId) {
       runControllers.get(runId)?.abort();
     },
+
+    async generateTitle(nodeId) {
+      try {
+        const s = get();
+        const node = s.nodes[nodeId];
+        if (!node || node.title.trim()) return;
+        if (!extractionConfigured(s.modelSettings)) return;
+        const gen = resolveExtraction(s.modelSettings);
+        if (!gen) return;
+        const adapter = globalRegistry.get(gen.adapterId);
+        const source = (node.content || node.plainText).slice(0, 4000);
+        if (!source.trim()) return;
+        const title = await adapter.generateObject({
+          providerId: gen.providerId,
+          modelId: gen.modelId,
+          role: "quick_explore",
+          kind: "title",
+          prompt:
+            'Write a concise title (3-8 words) that captures the main point of this note. ' +
+            'Respond with JSON: {"title": "..."}. No punctuation at the end.',
+          payload: { text: source },
+          parse: parseGeneratedTitle,
+        });
+        // still empty? the user may have typed one meanwhile — respect that
+        const fresh = get().nodes[nodeId];
+        if (!fresh || fresh.title.trim()) return;
+        set((st) => {
+          const target = st.nodes[nodeId];
+          if (!target) return {};
+          return { nodes: { ...st.nodes, [nodeId]: { ...target, title } } };
+        });
+      } catch {
+        // cosmetic background task — silence is fine
+      }
+    },
   };
+}
+
+function parseGeneratedTitle(raw: unknown): string {
+  let candidate: unknown = raw;
+  if (raw && typeof raw === "object" && "title" in raw) {
+    candidate = (raw as { title?: unknown }).title;
+  }
+  if (typeof candidate !== "string") throw new Error("no title");
+  const clean = candidate.trim().replace(/\s+/g, " ").replace(/[.!?]+$/, "");
+  if (!clean) throw new Error("empty title");
+  return clean.slice(0, 110);
 }
 
 async function executeExploration(set: SetFn, get: GetFn): Promise<void> {
