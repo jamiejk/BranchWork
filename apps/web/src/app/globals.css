@@ -344,7 +344,6 @@ body {
   flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-left: 4px solid #c9ccd2;
   border-radius: var(--radius);
   padding: 10px 12px 12px;
   box-shadow: 0 1px 2px rgba(30, 34, 40, 0.06);
@@ -354,18 +353,11 @@ body {
 .bw-card:hover {
   box-shadow: 0 3px 10px rgba(30, 34, 40, 0.1);
 }
+/* selection: quiet dotted outline instead of a heavy ring */
 .bw-card-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft), 0 4px 14px rgba(58, 110, 165, 0.14);
+  outline: 2px dotted var(--accent);
+  outline-offset: 3px;
 }
-
-.bw-type-question { border-left-color: #7d6cae; }
-.bw-type-claim { border-left-color: #3a6ea5; }
-.bw-type-counterclaim { border-left-color: #b3564d; }
-.bw-type-evidence { border-left-color: #3e7d5a; }
-.bw-type-excerpt { border-left-color: #8a6d3b; }
-.bw-type-source { border-left-color: #5d6d58; }
-.bw-type-exploration { border-left-color: #a5793a; }
 
 .bw-chip {
   display: inline-block;

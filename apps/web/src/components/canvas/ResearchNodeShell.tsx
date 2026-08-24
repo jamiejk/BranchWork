@@ -51,6 +51,34 @@ function ResearchNodeShellInner({ data }: NodeProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const [titleEditing, setTitleEditing] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const hoverTimer = useRef<number | undefined>(undefined);
+
+  // Keep the resizer mounted for the whole life of a handle press: the drag
+  // usually leaves the card bounds immediately, which would otherwise fire
+  // mouseleave and unmount the controls mid-gesture.
+  useEffect(() => {
+    const down = (e: PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest?.(".react-flow__resize-control")) setResizing(true);
+    };
+    const up = () => {
+      window.setTimeout(() => setResizing(false), 60);
+    };
+    window.addEventListener("pointerdown", down, true);
+    window.addEventListener("pointerup", up, true);
+    return () => {
+      window.removeEventListener("pointerdown", down, true);
+      window.removeEventListener("pointerup", up, true);
+    };
+  }, []);
+
+  const markHovered = (value: boolean) => {
+    window.clearTimeout(hoverTimer.current);
+    if (value) setHovered(true);
+    else hoverTimer.current = window.setTimeout(() => setHovered(false), 150);
+  };
 
   useEffect(() => {
     if (!card.editing) return;
@@ -115,11 +143,12 @@ function ResearchNodeShellInner({ data }: NodeProps) {
   return (
     <>
       <NodeResizer
-        isVisible={card.selected && !card.editing}
+        isVisible={(hovered || resizing || card.selected) && !card.editing}
         minWidth={220}
         minHeight={110}
         lineClassName="bw-resize-line"
         handleClassName="bw-resize-handle"
+        onResizeStart={() => setResizing(true)}
         onResizeEnd={(_, params) => {
           store.getState().setNodeSize(card.nodeId, {
             width: Math.round(params.width),
@@ -128,6 +157,8 @@ function ResearchNodeShellInner({ data }: NodeProps) {
         }}
       />
       <div
+        onMouseEnter={() => markHovered(true)}
+        onMouseLeave={() => markHovered(false)}
         className={[
           "bw-card",
           TYPE_CLASS[card.type] ?? "",
