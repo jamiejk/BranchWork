@@ -20,6 +20,7 @@ import {
   createResearchNode,
   derivePlainText,
   type ModelRun,
+  type NodeType,
   type NodeId,
   type PassageProvenance,
   type ResearchEdge,
@@ -290,6 +291,21 @@ async function runPostStreamExtractions(
   }
 }
 
+/** Map the extractor's kind field onto real card types. */
+function entityTypeForKind(kind: string): NodeType {
+  switch (kind) {
+    case "person":
+      return "person";
+    case "work":
+    case "organisation":
+    case "event":
+    case "technology":
+      return "entity";
+    default:
+      return "concept";
+  }
+}
+
 function attachEntityNodes(
   set: SetFn,
   get: GetFn,
@@ -307,7 +323,7 @@ function attachEntityNodes(
   plan.forEach((entity, index) => {
     const node = createResearchNode({
       projectId: s.project.id,
-      type: "concept",
+      type: entityTypeForKind(entity.kind),
       title: entity.name,
       content: `Surfaced as a ${entity.kind} in this branch.`,
       authorKind: "model",
