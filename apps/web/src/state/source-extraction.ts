@@ -34,6 +34,16 @@ export const ENTITY_PROMPT = [
   "If there are none, respond with an empty list.",
 ].join(" ");
 
+export const BUILD_OUT_PROMPT = [
+  "Given this research note, suggest related resources for further investigation.",
+  "Respond with JSON:",
+  '{"sources": [{"title": "...", "url": "..."}],',
+  ' "persons": [{"name": "...", "role": "why relevant"}],',
+  ' "concepts": [{"name": "...", "definition": "one-sentence definition"}]}.',
+  "Only include real, well-known items you are confident exist.",
+  "At most 3 per category. If a category is empty, use an empty list.",
+].join(" ");
+
 /** Lenient parser for the model's JSON reply; accepts a bare array too. */
 export function parseExtractedSources(raw: unknown): ExtractedSource[] {
   let list: unknown = raw;
@@ -164,4 +174,52 @@ export function planNewEntityNodes(
       .filter(Boolean)
   );
   return entities.filter((e) => !titles.has(e.name.trim().toLowerCase()));
+}
+
+// ---- build-out: generative suggestions from the background model ----
+
+export interface BuildOutSource {
+  title: string;
+  url: string;
+}
+export interface BuildOutPerson {
+  name: string;
+  role: string;
+}
+export interface BuildOutConcept {
+  name: string;
+  definition: string;
+}
+export interface BuildOutResult {
+  sources: BuildOutSource[];
+  persons: BuildOutPerson[];
+  concepts: BuildOutConcept[];
+}
+
+export function parseBuildOut(raw: unknown): BuildOutResult {
+  const obj = (raw ?? {}) as Record<string, unknown>;
+  const pickArray = (key: string): Array<Record<string, unknown>> =>
+    Array.isArray(obj[key]) ? (obj[key] as Array<Record<string, unknown>>) : [];
+  const sources: BuildOutSource[] = pickArray("sources")
+    .filter((s) => typeof s.title === "string" && s.title.trim())
+    .slice(0, 3)
+    .map((s) => ({
+      title: (s.title as string).trim().slice(0, 110),
+      url: typeof s.url === "string" ? s.url.trim() : "",
+    }));
+  const persons: BuildOutPerson[] = pickArray("persons")
+    .filter((p) => typeof p.name === "string" && p.name.trim())
+    .slice(0, 3)
+    .map((p) => ({
+      name: (p.name as string).trim().slice(0, 80),
+      role: typeof p.role === "string" ? p.role.trim().slice(0, 200) : "",
+    }));
+  const concepts: BuildOutConcept[] = pickArray("concepts")
+    .filter((c) => typeof c.name === "string" && c.name.trim())
+    .slice(0, 5)
+    .map((c) => ({
+      name: (c.name as string).trim().slice(0, 80),
+      definition: typeof c.definition === "string" ? c.definition.trim().slice(0, 300) : "",
+    }));
+  return { sources, persons, concepts };
 }

@@ -50,9 +50,11 @@ if (port === null) {
 if (port !== base) {
   console.log(`[preflight] Port ${base} is busy — using ${port} instead.`);
 }
-console.log(`[preflight] Starting web app on http://localhost:${port}`);
+const prod = process.argv.includes("--prod");
+const command = prod ? "start" : "dev";
+console.log(`[preflight] Starting web app (${command}) on http://localhost:${port}`);
 
-const child = spawn(NEXT_BIN, ["dev", "--port", String(port)], {
+const child = spawn(NEXT_BIN, [command, "--port", String(port)], {
   cwd: WEB_DIR,
   stdio: "inherit",
 });

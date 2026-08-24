@@ -28,9 +28,11 @@ import {
 } from "@branchwork/domain";
 import { resolveAdapter, resolveExtraction } from "./generation";
 import {
+  BUILD_OUT_PROMPT,
   ENTITY_PROMPT,
   EXTRACTION_PROMPT,
   extractionConfigured,
+  parseBuildOut,
   parseExtractedEntities,
   parseExtractedSources,
   planNewEntityNodes,
@@ -52,6 +54,8 @@ export interface ModelRunActions {
   cancelRun: (runId: string) => void;
   /** Ask the background model for a concise title (used on first capture). */
   generateTitle: (nodeId: NodeId) => Promise<void>;
+  /** Ask the background model to suggest related sources/people/concepts. */
+  buildOutBranch: (nodeId: NodeId) => Promise<void>;
 }
 
 export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
@@ -103,6 +107,100 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
         });
       } catch {
         // cosmetic background task — the first-line title just stays
+      }
+    },
+
+    async buildOutBranch(nodeId) {
+      try {
+        const s = get();
+        const parent = s.nodes[nodeId];
+        if (!parent) return;
+        if (!extractionConfigured(s.modelSettings)) {
+          get().showToast("Configure a background model in ⚙ Models to use Build out.");
+          return;
+        }
+        const gen = resolveExtraction(s.modelSettings);
+        if (!gen) return;
+        const adapter = globalRegistry.get(gen.adapterId);
+        const source = (parent.content || parent.plainText).slice(0, 8000);
+        if (!source.trim()) {
+          get().showToast("This card has no content to build out from yet.");
+          return;
+        }
+
+        get().showToast("Building out branch…");
+
+        const result = await adapter.generateObject({
+          providerId: gen.providerId,
+          modelId: gen.modelId,
+          role: "quick_explore",
+          kind: "build_out",
+          prompt: BUILD_OUT_PROMPT,
+          payload: { text: source },
+          parse: parseBuildOut,
+        });
+
+        let created = 0;
+        let lane = 0;
+        const nodesToAdd: Record<string, ResearchNode> = {};
+        const edgesToAdd: Record<string, ResearchEdge> = {};
+
+        for (const src of result.sources) {
+          const node = createResearchNode({
+            projectId: s.project.id, type: "source", title: src.title,
+            content: src.url || `Suggested by background model`,
+            authorKind: "model",
+            position: { x: parent.position.x + (parent.size?.width ?? 460) + 120, y: parent.position.y + lane * 150 },
+          });
+          nodesToAdd[node.id] = node;
+          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "cites", createdBy: "model" });
+          edgesToAdd[edge.id] = edge;
+          lane++; created++;
+        }
+
+        for (const p of result.persons) {
+          const dup = Object.values(s.nodes).find((n) => n.title.trim().toLowerCase() === p.name.toLowerCase());
+          if (dup) continue;
+          const node = createResearchNode({
+            projectId: s.project.id, type: "person", title: p.name,
+            content: p.role || `Relevant to ${parent.title}.`,
+            authorKind: "model",
+            position: { x: parent.position.x, y: parent.position.y + (parent.size?.height ?? 200) + 140 + lane * 130 },
+          });
+          nodesToAdd[node.id] = node;
+          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "branches_from", createdBy: "model" });
+          edgesToAdd[edge.id] = edge;
+          lane++; created++;
+        }
+
+        for (const c of result.concepts) {
+          const dup = Object.values(s.nodes).find((n) => n.title.trim().toLowerCase() === c.name.toLowerCase());
+          if (dup) continue;
+          const node = createResearchNode({
+            projectId: s.project.id, type: "concept", title: c.name,
+            content: c.definition,
+            authorKind: "model",
+            position: { x: parent.position.x + 40, y: parent.position.y + (parent.size?.height ?? 200) + 280 + lane * 130 },
+          });
+          nodesToAdd[node.id] = node;
+          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "related_to", createdBy: "model" });
+          edgesToAdd[edge.id] = edge;
+          lane++; created++;
+        }
+
+        if (created === 0) {
+          get().showToast("Build out found nothing new.");
+          return;
+        }
+
+        get().pushHistory();
+        set((st) => ({
+          nodes: { ...st.nodes, ...nodesToAdd },
+          edges: { ...st.edges, ...edgesToAdd },
+        }));
+        get().showToast(`Build out: ${created} card${created === 1 ? "" : "s"} added.`);
+      } catch (error) {
+        get().showToast(`Build out failed: ${(error as Error).message}`);
       }
     },
   };

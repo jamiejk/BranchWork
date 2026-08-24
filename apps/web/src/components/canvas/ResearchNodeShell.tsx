@@ -286,6 +286,16 @@ function ResearchNodeShellInner({ data }: NodeProps) {
           </button>
           <button
             className="bw-tool-btn"
+            title="Suggest related sources, people and concepts"
+            onClick={(e) => {
+              e.stopPropagation();
+              void store.getState().buildOutBranch(card.nodeId);
+            }}
+          >
+            🌱 build
+          </button>
+          <button
+            className="bw-tool-btn"
             title="Explore from here with a model"
             onClick={(e) => {
               e.stopPropagation();
