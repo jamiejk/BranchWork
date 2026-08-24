@@ -152,14 +152,21 @@ export function TopBar() {
         )}
         <button
           className="btn btn-small bw-save-btn"
-          onClick={() => setSaveOpen(true)}
-          title="Saves: switch folders or save the current canvas under a name"
+          onClick={() => {
+            checkpoint("Manual save");
+            showToast(`Saved to "${currentSave}" ✓`);
+          }}
+          title={`Save now to saves/${currentSave}/ (Ctrl+S)`}
         >
           💾 Save
         </button>
-        <span className="bw-disk-chip" title={`Autosaving to saves/${currentSave}/`}>
-          📂 {currentSave}
-        </span>
+        <button
+          className="btn btn-small bw-disk-chip bw-disk-chip-btn"
+          title="Pick or switch save folders"
+          onClick={() => setSaveOpen(true)}
+        >
+          📂 {currentSave} ▾
+        </button>
         <button
           className="btn btn-small"
           onClick={() => setVersionsOpen(true)}
