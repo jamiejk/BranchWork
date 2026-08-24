@@ -70,6 +70,7 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
   activeTab: "canvas" | "manuscript";
   contextPreview: ContextPreviewState | null;
   streamingRunIds: string[];
+  backgroundBusyIds: NodeId[];
   toast: string | null;
   loaded: boolean;
   modelSettings: ModelSettings;
@@ -151,6 +152,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
   activeTab: "canvas",
   contextPreview: null,
   streamingRunIds: [],
+  backgroundBusyIds: [],
   toast: null,
   loaded: false,
   modelSettings: EMPTY_SETTINGS,

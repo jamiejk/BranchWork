@@ -28,6 +28,7 @@ export interface ResearchNodeData {
   collapsed: boolean;
   hiddenDescendants: number;
   streaming: boolean;
+  busy: boolean;
   sized: boolean;
 }
 
@@ -173,6 +174,7 @@ function ResearchNodeShellInner({ data }: NodeProps) {
           card.status === "excluded" ? "bw-card-excluded" : "",
           card.sized ? "bw-card-sized" : "",
           card.streaming ? "bw-card-streaming" : "",
+          card.busy ? "bw-card-busy" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -351,6 +353,7 @@ export const ResearchNodeShell = memo(ResearchNodeShellInner, (a, b) => {
     prev.collapsed === next.collapsed &&
     prev.hiddenDescendants === next.hiddenDescendants &&
     prev.streaming === next.streaming &&
-    prev.sized === next.sized
+    prev.sized === next.sized &&
+    prev.busy === next.busy
   );
 });

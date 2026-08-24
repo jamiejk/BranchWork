@@ -44,6 +44,37 @@ export const BUILD_OUT_PROMPT = [
   "At most 3 per category. If a category is empty, use an empty list.",
 ].join(" ");
 
+export const SEARCH_QUERIES_PROMPT = [
+  "Given this research note, generate 3-4 diverse web search queries that would find",
+  "relevant sources, key people involved, and important concepts.",
+  'Respond with JSON: {"queries": [["search query text", "source"], ["query about people", "person"], ...]}.',
+  "The second element of each pair is the card type: source, person, or concept.",
+  "Make queries specific enough to find actual resources, not just overview articles.",
+].join(" ");
+
+export interface SearchQueryPair {
+  query: string;
+  cardType: string;
+}
+
+export function parseSearchQueries(raw: unknown): SearchQueryPair[] {
+  let list: unknown = raw;
+  if (raw && typeof raw === "object" && "queries" in raw) {
+    list = (raw as { queries?: unknown }).queries;
+  }
+  if (!Array.isArray(list)) return [];
+  const out: SearchQueryPair[] = [];
+  for (const item of list) {
+    if (Array.isArray(item) && typeof item[0] === "string" && item[0].trim()) {
+      out.push({ query: item[0].trim(), cardType: typeof item[1] === "string" ? item[1] : "source" });
+    } else if (typeof item === "string" && item.trim()) {
+      out.push({ query: item.trim(), cardType: "source" });
+    }
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
 /** Lenient parser for the model's JSON reply; accepts a bare array too. */
 export function parseExtractedSources(raw: unknown): ExtractedSource[] {
   let list: unknown = raw;

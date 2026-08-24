@@ -31,10 +31,12 @@ import {
   BUILD_OUT_PROMPT,
   ENTITY_PROMPT,
   EXTRACTION_PROMPT,
+  SEARCH_QUERIES_PROMPT,
   extractionConfigured,
   parseBuildOut,
   parseExtractedEntities,
   parseExtractedSources,
+  parseSearchQueries,
   planNewEntityNodes,
   planNewSourceNodes,
   sourceNodePosition,
@@ -69,6 +71,7 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
     },
 
     async generateTitle(nodeId) {
+      set((s) => ({ backgroundBusyIds: [...s.backgroundBusyIds, nodeId] }));
       try {
         const s = get();
         const node = s.nodes[nodeId];
@@ -107,10 +110,13 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
         });
       } catch {
         // cosmetic background task — the first-line title just stays
+      } finally {
+        set((s) => ({ backgroundBusyIds: s.backgroundBusyIds.filter((id) => id !== nodeId) }));
       }
     },
 
     async buildOutBranch(nodeId) {
+      set((s) => ({ backgroundBusyIds: [...s.backgroundBusyIds, nodeId] }));
       try {
         const s = get();
         const parent = s.nodes[nodeId];
@@ -130,35 +136,69 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
 
         get().showToast("Building out branch…");
 
-        // send the card text inline — no JSON payload wrapper, which confuses
-        // small local models into responding about the envelope instead
-        const result = await adapter.generateObject({
-          providerId: gen.providerId,
-          modelId: gen.modelId,
-          role: "quick_explore",
-          kind: "build_out",
-          prompt: `${BUILD_OUT_PROMPT}\n\n---\n${source}`,
-          parse: parseBuildOut,
-        });
+        // Phase 1: ask Gemma for search queries
+        let searchResults: Array<{ title: string; url: string; snippet: string; cardType: string }> = [];
+        try {
+          const queries = await adapter.generateObject({
+            providerId: gen.providerId,
+            modelId: gen.modelId,
+            role: "quick_explore",
+            kind: "search_queries",
+            prompt: `${SEARCH_QUERIES_PROMPT}\n\n---\n${source}`,
+            parse: parseSearchQueries,
+          });
+          if (queries.length > 0) {
+            // Phase 2: run ddgr with those queries via the API route
+            const res = await fetch("/api/build-out", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ queries: queries.map((q) => [q.query, q.cardType]) }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              searchResults = data.results ?? [];
+            }
+          }
+        } catch {
+          // web search is optional; Gemma's own suggestions still work below
+        }
 
-        // format results as markdown and append to the card's own body
+        // Phase 3: Gemma's knowledge-based suggestions for people & concepts
+        let gemmaSuggestions: { persons: Array<{ name: string; role: string }>; concepts: Array<{ name: string; definition: string }> } = {
+          persons: [], concepts: [],
+        };
+        try {
+          gemmaSuggestions = await adapter.generateObject({
+            providerId: gen.providerId,
+            modelId: gen.modelId,
+            role: "quick_explore",
+            kind: "build_out",
+            prompt: `${BUILD_OUT_PROMPT}\n\n---\n${source}`,
+            parse: parseBuildOut,
+          });
+        } catch {
+          // non-fatal
+        }
+
+        // Format everything as markdown and append to the card body
         const sections: string[] = [];
-        if (result.sources.length > 0) {
+
+        if (searchResults.length > 0) {
           sections.push(
-            "### Related sources\n" +
-            result.sources.map((src) => `- ${src.title}${src.url ? ` — [link](${src.url})` : ""}`).join("\n")
+            "### Web sources\n" +
+            searchResults.map((r) => `- [${r.title}](${r.url})${r.snippet ? `\n  ${r.snippet.slice(0, 200)}` : ""}`).join("\n")
           );
         }
-        if (result.persons.length > 0) {
+        if (gemmaSuggestions.persons.length > 0) {
           sections.push(
             "### People\n" +
-            result.persons.map((p) => `- **${p.name}**${p.role ? ` — ${p.role}` : ""}`).join("\n")
+            gemmaSuggestions.persons.map((p) => `- **${p.name}**${p.role ? ` — ${p.role}` : ""}`).join("\n")
           );
         }
-        if (result.concepts.length > 0) {
+        if (gemmaSuggestions.concepts.length > 0) {
           sections.push(
             "### Concepts\n" +
-            result.concepts.map((c) => `- **${c.name}**${c.definition ? `: ${c.definition}` : ""}`).join("\n")
+            gemmaSuggestions.concepts.map((c) => `- **${c.name}**${c.definition ? `: ${c.definition}` : ""}`).join("\n")
           );
         }
 
@@ -178,13 +218,15 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
         });
 
         const counts = [
-          result.sources.length ? `${result.sources.length} sources` : "",
-          result.persons.length ? `${result.persons.length} people` : "",
-          result.concepts.length ? `${result.concepts.length} concepts` : "",
+          searchResults.length ? `${searchResults.length} web results` : "",
+          gemmaSuggestions.persons.length ? `${gemmaSuggestions.persons.length} people` : "",
+          gemmaSuggestions.concepts.length ? `${gemmaSuggestions.concepts.length} concepts` : "",
         ].filter(Boolean);
         get().showToast(`Build out appended: ${counts.join(", ")}.`);
       } catch (error) {
         get().showToast(`Build out failed: ${(error as Error).message}`);
+      } finally {
+        set((s) => ({ backgroundBusyIds: s.backgroundBusyIds.filter((id) => id !== nodeId) }));
       }
     },
   };
