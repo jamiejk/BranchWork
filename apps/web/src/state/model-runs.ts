@@ -130,75 +130,59 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
 
         get().showToast("Building out branch…");
 
+        // send the card text inline — no JSON payload wrapper, which confuses
+        // small local models into responding about the envelope instead
         const result = await adapter.generateObject({
           providerId: gen.providerId,
           modelId: gen.modelId,
           role: "quick_explore",
           kind: "build_out",
-          prompt: BUILD_OUT_PROMPT,
-          payload: { text: source },
+          prompt: `${BUILD_OUT_PROMPT}\n\n---\n${source}`,
           parse: parseBuildOut,
         });
 
-        let created = 0;
-        let lane = 0;
-        const nodesToAdd: Record<string, ResearchNode> = {};
-        const edgesToAdd: Record<string, ResearchEdge> = {};
-
-        for (const src of result.sources) {
-          const node = createResearchNode({
-            projectId: s.project.id, type: "source", title: src.title,
-            content: src.url || `Suggested by background model`,
-            authorKind: "model",
-            position: { x: parent.position.x + (parent.size?.width ?? 460) + 120, y: parent.position.y + lane * 150 },
-          });
-          nodesToAdd[node.id] = node;
-          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "cites", createdBy: "model" });
-          edgesToAdd[edge.id] = edge;
-          lane++; created++;
+        // format results as markdown and append to the card's own body
+        const sections: string[] = [];
+        if (result.sources.length > 0) {
+          sections.push(
+            "### Related sources\n" +
+            result.sources.map((src) => `- ${src.title}${src.url ? ` — [link](${src.url})` : ""}`).join("\n")
+          );
+        }
+        if (result.persons.length > 0) {
+          sections.push(
+            "### People\n" +
+            result.persons.map((p) => `- **${p.name}**${p.role ? ` — ${p.role}` : ""}`).join("\n")
+          );
+        }
+        if (result.concepts.length > 0) {
+          sections.push(
+            "### Concepts\n" +
+            result.concepts.map((c) => `- **${c.name}**${c.definition ? `: ${c.definition}` : ""}`).join("\n")
+          );
         }
 
-        for (const p of result.persons) {
-          const dup = Object.values(s.nodes).find((n) => n.title.trim().toLowerCase() === p.name.toLowerCase());
-          if (dup) continue;
-          const node = createResearchNode({
-            projectId: s.project.id, type: "person", title: p.name,
-            content: p.role || `Relevant to ${parent.title}.`,
-            authorKind: "model",
-            position: { x: parent.position.x, y: parent.position.y + (parent.size?.height ?? 200) + 140 + lane * 130 },
-          });
-          nodesToAdd[node.id] = node;
-          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "branches_from", createdBy: "model" });
-          edgesToAdd[edge.id] = edge;
-          lane++; created++;
-        }
-
-        for (const c of result.concepts) {
-          const dup = Object.values(s.nodes).find((n) => n.title.trim().toLowerCase() === c.name.toLowerCase());
-          if (dup) continue;
-          const node = createResearchNode({
-            projectId: s.project.id, type: "concept", title: c.name,
-            content: c.definition,
-            authorKind: "model",
-            position: { x: parent.position.x + 40, y: parent.position.y + (parent.size?.height ?? 200) + 280 + lane * 130 },
-          });
-          nodesToAdd[node.id] = node;
-          const edge = createResearchEdge({ projectId: s.project.id, sourceNodeId: nodeId, targetNodeId: node.id, type: "related_to", createdBy: "model" });
-          edgesToAdd[edge.id] = edge;
-          lane++; created++;
-        }
-
-        if (created === 0) {
+        if (sections.length === 0) {
           get().showToast("Build out found nothing new.");
           return;
         }
 
+        const addition = "\n\n---\n\n" + sections.join("\n\n");
+        const nextContent = parent.content + addition;
+
         get().pushHistory();
-        set((st) => ({
-          nodes: { ...st.nodes, ...nodesToAdd },
-          edges: { ...st.edges, ...edgesToAdd },
-        }));
-        get().showToast(`Build out: ${created} card${created === 1 ? "" : "s"} added.`);
+        set((st) => {
+          const node = st.nodes[nodeId];
+          if (!node) return {};
+          return { nodes: { ...st.nodes, [nodeId]: { ...node, content: nextContent } } };
+        });
+
+        const counts = [
+          result.sources.length ? `${result.sources.length} sources` : "",
+          result.persons.length ? `${result.persons.length} people` : "",
+          result.concepts.length ? `${result.concepts.length} concepts` : "",
+        ].filter(Boolean);
+        get().showToast(`Build out appended: ${counts.join(", ")}.`);
       } catch (error) {
         get().showToast(`Build out failed: ${(error as Error).message}`);
       }
