@@ -95,36 +95,49 @@ export class OpenAiCompatAdapter implements BranchworkModelAdapter {
     }
     messages.push({ role: "user", content: request.prompt });
 
-    const body: Record<string, unknown> = {
+    const baseBody: Record<string, unknown> = {
       model: request.modelId,
       messages,
       stream: true,
     };
-    if (request.temperature !== undefined) body.temperature = request.temperature;
-    if (request.maxOutputTokens !== undefined) body.max_tokens = request.maxOutputTokens;
+    if (request.temperature !== undefined) baseBody.temperature = request.temperature;
+    if (request.maxOutputTokens !== undefined) baseBody.max_tokens = request.maxOutputTokens;
+
+    const attemptBodies: Record<string, unknown>[] = [baseBody];
     if (request.reasoningEffort && modelSupportsEffort(request.modelId)) {
-      body.reasoning_effort = request.reasoningEffort;
+      // relays/upstreams that don't know reasoning_effort 400 the whole
+      // request — queue a stripped retry so the stream still runs
+      attemptBodies.unshift({ ...baseBody, reasoning_effort: request.reasoningEffort });
     }
 
-    let response: Response;
-    try {
-      response = await fetch(`${trimBase(endpoint.baseURL)}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${endpoint.apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: request.signal,
-      });
-    } catch (error) {
-      yield { type: "error", message: `Request failed: ${(error as Error).message}` };
-      return;
+    let response: Response | null = null;
+    let lastError = "";
+    for (const body of attemptBodies) {
+      try {
+        response = await fetch(`${trimBase(endpoint.baseURL)}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${endpoint.apiKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: request.signal,
+        });
+      } catch (error) {
+        lastError = `Request failed: ${(error as Error).message}`;
+        continue;
+      }
+      if (response.ok && response.body) break;
+      lastError = `${response.status} ${response.statusText}: ${await safeErrorText(response)}`;
+      if (response.status !== 400 && response.status !== 422) {
+        yield { type: "error", message: lastError };
+        return;
+      }
+      response = null; // try the next, plainer variant
     }
 
-    if (!response.ok || !response.body) {
-      const detail = await safeErrorText(response);
-      yield { type: "error", message: `${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}` };
+    if (!response || !response.ok || !response.body) {
+      yield { type: "error", message: lastError || "Request failed." };
       return;
     }
 

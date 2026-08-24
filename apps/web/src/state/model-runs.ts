@@ -224,6 +224,7 @@ async function executeExploration(set: SetFn, get: GetFn): Promise<void> {
       estimateTokens(buffer),
       (error as Error).message
     );
+    get().showToast(`Exploration failed: ${(error as Error).message}`);
   } finally {
     runControllers.delete(run.id);
     set((st) => ({ streamingRunIds: st.streamingRunIds.filter((x) => x !== run.id) }));
