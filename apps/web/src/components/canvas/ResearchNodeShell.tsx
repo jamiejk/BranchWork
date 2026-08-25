@@ -129,7 +129,9 @@ function ResearchNodeShellInner({ data }: NodeProps) {
 
     // Ask the background model to propose a sharper title (fire-and-forget).
     // generateTitle only overwrites if the user hasn't edited it meanwhile.
-    if (nextTitle.trim()) {
+    // Skip refinement when the note is just its title line — a short
+    // deliberate name like "Elizabeth Loftus" must not be replaced.
+    if (nextTitle.trim() && content.trim()) {
       void store.getState().generateTitle(card.nodeId);
     }
   };

@@ -4,6 +4,7 @@
 // post-stream source extraction. Pure orchestration lives here; the store
 // composes it in.
 
+import { NODE_TYPE_REGISTRY } from "@branchwork/domain";
 import {
   globalRegistry,
   ROLE_PRESETS,
@@ -128,8 +129,25 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
         const gen = resolveExtraction(s.modelSettings);
         if (!gen) return;
         const adapter = globalRegistry.get(gen.adapterId);
-        const source = (parent.content || parent.plainText).slice(0, 8000);
-        if (!source.trim()) {
+
+        // Card subject: title + type + body. A one-liner card keeps its text
+        // in the title, so the title is the most important part of the source.
+        const typeLabel = NODE_TYPE_REGISTRY[parent.type]?.label ?? parent.type;
+        const body = (parent.content || "").slice(0, 4000);
+        const subject = [`Card: ${parent.title} (type: ${typeLabel})`, body && `Body:\n${body}`]
+          .filter(Boolean)
+          .join("\n");
+
+        // Context from the linked card one level back (first incoming edge).
+        let parentContext = "";
+        const incoming = Object.values(s.edges).find((e) => e.targetNodeId === nodeId);
+        const upstream = incoming ? s.nodes[incoming.sourceNodeId] : undefined;
+        if (upstream && (upstream.title || upstream.content)) {
+          parentContext =
+            `Parent note for context: ${upstream.title}\n` +
+            (upstream.content || "").slice(0, 1200);
+        }
+        if (!subject.trim() && !parentContext) {
           get().showToast("This card has no content to build out from yet.");
           return;
         }
@@ -144,7 +162,8 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
             modelId: gen.modelId,
             role: "quick_explore",
             kind: "search_queries",
-            prompt: `${SEARCH_QUERIES_PROMPT}\n\n---\n${source}`,
+            prompt:
+              `${SEARCH_QUERIES_PROMPT}\n\n${parentContext ? parentContext + "\n\n" : ""}${subject}`,
             parse: parseSearchQueries,
           });
           if (queries.length > 0) {
@@ -173,7 +192,8 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
             modelId: gen.modelId,
             role: "quick_explore",
             kind: "build_out",
-            prompt: `${BUILD_OUT_PROMPT}\n\n---\n${source}`,
+            prompt:
+              `${BUILD_OUT_PROMPT}\n\n${parentContext ? parentContext + "\n\n" : ""}${subject}`,
             parse: parseBuildOut,
           });
         } catch {
@@ -208,12 +228,13 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
         }
 
         const addition = "\n\n---\n\n" + sections.join("\n\n");
-        const nextContent = parent.content + addition;
 
         get().pushHistory();
         set((st) => {
           const node = st.nodes[nodeId];
           if (!node) return {};
+          // read fresh content so we never clobber edits made while running
+          const nextContent = (node.content || "") + addition;
           return { nodes: { ...st.nodes, [nodeId]: { ...node, content: nextContent } } };
         });
 

@@ -45,11 +45,15 @@ export const BUILD_OUT_PROMPT = [
 ].join(" ");
 
 export const SEARCH_QUERIES_PROMPT = [
-  "Given this research note, generate 3-4 diverse web search queries that would find",
-  "relevant sources, key people involved, and important concepts.",
+  "You are generating web search queries to research a card in a knowledge graph.",
+  "The card has a title, a type (person, entity, concept, source, exploration), and optional body.",
+  "A parent note from the graph may be given as context — use it to disambiguate",
+  "(e.g. which field or era the topic belongs to), but search for the CARD's subject, not the parent.",
+  "Generate 3-4 diverse queries: the person/topic by name, their key work or controversy,",
+  "and related concepts. Fold the card type naturally into phrasing",
+  '(e.g. "Elizabeth Loftus memory researcher" for a person card).',
   'Respond with JSON: {"queries": [["search query text", "source"], ["query about people", "person"], ...]}.',
   "The second element of each pair is the card type: source, person, or concept.",
-  "Make queries specific enough to find actual resources, not just overview articles.",
 ].join(" ");
 
 export interface SearchQueryPair {
