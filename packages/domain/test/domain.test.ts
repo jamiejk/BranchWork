@@ -109,7 +109,7 @@ describe("branchworkExportFileSchema", () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    const bundle = createExportBundle({
+    const bundle = branchworkExportFileSchema.parse({
       project: { id: projectId, title: "Script", customCardTypes, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
       nodes: [n],
     });
