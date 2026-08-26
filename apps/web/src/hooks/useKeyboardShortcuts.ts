@@ -25,6 +25,12 @@ export function useKeyboardShortcuts(): void {
         return;
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        document.dispatchEvent(new CustomEvent("bw:new-project"));
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         if (inTextField && !event.shiftKey) return;
         event.preventDefault();

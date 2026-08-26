@@ -7,6 +7,7 @@ import {
   downloadProjectJson,
   getCurrentSave,
   importProjectJson,
+  newProject,
   reconnectDiskFile,
   hasLinkedDiskFile,
 } from "../state/persistence";
@@ -14,6 +15,7 @@ import { diskLinkSupported, linkToDiskFile } from "../state/fileProject";
 import { ModelSettingsModal } from "./ModelSettingsModal";
 import { VersionsModal } from "./VersionsModal";
 import { SaveModal } from "./SaveModal";
+import { NewProjectModal } from "./NewProjectModal";
 import { FileMenu, type FileMenuItem } from "./FileMenu";
 
 export function TopBar() {
@@ -30,6 +32,7 @@ export function TopBar() {
   const [modelsOpen, setModelsOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
   const [currentSave, setCurrentSave] = useState("");
   const [diskFile, setDiskFile] = useState<{ name: string; needsPermission: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -48,6 +51,13 @@ export function TopBar() {
     const openVersions = () => setVersionsOpen(true);
     document.addEventListener("bw:versions-open", openVersions);
     return () => document.removeEventListener("bw:versions-open", openVersions);
+  }, []);
+
+  // Ctrl+N opens the New-project dialog
+  useEffect(() => {
+    const openNew = () => setNewOpen(true);
+    document.addEventListener("bw:new-project", openNew);
+    return () => document.removeEventListener("bw:new-project", openNew);
   }, []);
 
   const activeModel =
@@ -80,6 +90,13 @@ export function TopBar() {
   };
 
   const fileItems: FileMenuItem[] = [
+    {
+      id: "new",
+      label: "New…",
+      hint: "Fresh canvas in its own save folder; current project stays safe",
+      shortcut: "Ctrl+N",
+      onSelect: () => setNewOpen(true),
+    },
     {
       id: "save",
       label: "Save",
@@ -238,6 +255,16 @@ export function TopBar() {
           onClose={() => {
             setCurrentSave(getCurrentSave());
             setSaveOpen(false);
+          }}
+        />
+      )}
+      {newOpen && (
+        <NewProjectModal
+          onClose={() => setNewOpen(false)}
+          onCreate={async (name) => {
+            const created = await newProject(name);
+            setCurrentSave(created);
+            return created;
           }}
         />
       )}

@@ -104,6 +104,19 @@ body {
   width: min(680px, 92vw);
 }
 
+.bw-modal-narrow {
+  width: min(460px, 92vw);
+}
+.bw-newproject-warn {
+  font-size: 0.8rem;
+  color: #8a6d3b;
+  background: #fdf6e9;
+  border: 1px solid #ecd9b0;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin: 8px 0 0;
+}
+
 .bw-model-rows {
   display: flex;
   flex-direction: column;

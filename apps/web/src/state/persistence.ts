@@ -221,6 +221,27 @@ export async function saveAs(input: string): Promise<string> {
   return clean;
 }
 
+/**
+ * Start a brand-new project in its own named save folder. The previous save
+ * stays untouched on disk, switchable via Save as / switch.
+ */
+export async function newProject(input?: string): Promise<string> {
+  const clean = sanitizeSaveName(
+    input && input.trim() ? input : `untitled-${new Date().toISOString().slice(0, 10)}`
+  );
+  useStore.getState().newEmptyProject();
+  currentSave = clean;
+  lastWritten = null;
+  lastSnapshotJson = null;
+  pendingForceVersion = false;
+  void registerSaveName(clean);
+  await setMeta("currentSave", clean);
+  // force-write the blank slate to the new folder (saveNow skips identical
+  // snapshots, so a real write needs the forced checkpoint path)
+  checkpoint(`New project “${clean}”`);
+  return clean;
+}
+
 /** Load a named save's latest file into the store and make it active. */
 export async function switchToSave(name: string): Promise<boolean> {
   const raw = await readSaveFile(name);

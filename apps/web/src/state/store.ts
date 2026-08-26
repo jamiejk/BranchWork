@@ -78,6 +78,8 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
 
   loadFromBundle: (data: unknown) => boolean;
   seedDemoProject: () => void;
+  /** Blank-slate project: untitled, single root question card. */
+  newEmptyProject: () => void;
 
   setActiveModel: (modelId: string | null) => void;
   updateModelSettings: (settings: ModelSettings) => void;
@@ -211,6 +213,40 @@ export const useStore = create<BranchworkState>()((set, get) => ({
       loaded: true,
     });
     return true;
+  },
+
+  /** Blank-slate project: untitled, single root question card at origin. */
+  newEmptyProject() {
+    const project: Project = {
+      id: `p_${crypto.randomUUID().slice(0, 8)}`,
+      title: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const root = createResearchNode({
+      projectId: project.id,
+      type: "question",
+      title: "Opening question",
+      content: "",
+      position: { x: 60, y: 240 },
+    });
+    undoStack.length = 0;
+    redoStack.length = 0;
+    set({
+      project,
+      nodes: { [root.id]: root },
+      edges: {},
+      manuscripts: {},
+      runs: {},
+      passages: {},
+      activeManuscriptId: null,
+      selectedNodeIds: [root.id],
+      selectedEdgeId: null,
+      collapsedIds: {},
+      editingNodeId: null,
+      titleEditNodeId: null,
+      loaded: true,
+    });
   },
 
   seedDemoProject() {
