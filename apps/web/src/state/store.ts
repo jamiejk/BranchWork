@@ -217,8 +217,14 @@ export const useStore = create<BranchworkState>()((set, get) => ({
 
   /** Blank-slate project: untitled, single root question card at origin. */
   newEmptyProject() {
+    // crypto.randomUUID needs a secure context (https/localhost); the app may
+    // be served over plain http on a LAN hostname, so fall back gracefully.
+    const uuid =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
     const project: Project = {
-      id: `p_${crypto.randomUUID().slice(0, 8)}`,
+      id: `p_${uuid.replace(/-/g, "").slice(0, 8)}`,
       title: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

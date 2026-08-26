@@ -109,10 +109,25 @@ export function resolveEndpoint(settings: ModelSettings, providerId: string): En
   return { baseURL: provider.baseURL, apiKey: provider.apiKey };
 }
 
+/** Random-enough id suffix; crypto.randomUUID needs a secure context, so fall back. */
+export function randomId8(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  }
+  const buf = new Uint32Array(2);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(buf); // getRandomValues works in insecure contexts too
+  } else {
+    buf[0] = Math.floor(Math.random() * 0xffffffff);
+    buf[1] = Date.now() >>> 0;
+  }
+  return Array.from(buf, (n) => n.toString(16).padStart(8, "0")).join("").slice(0, 8);
+}
+
 export function newProviderId(): string {
-  return `prov_${crypto.randomUUID().slice(0, 8)}`;
+  return `prov_${randomId8()}`;
 }
 
 export function newModelId(): string {
-  return `mdl_${crypto.randomUUID().slice(0, 8)}`;
+  return `mdl_${randomId8()}`;
 }
