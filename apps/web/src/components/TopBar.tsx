@@ -14,6 +14,7 @@ import { diskLinkSupported, linkToDiskFile } from "../state/fileProject";
 import { ModelSettingsModal } from "./ModelSettingsModal";
 import { VersionsModal } from "./VersionsModal";
 import { SaveModal } from "./SaveModal";
+import { FileMenu, type FileMenuItem } from "./FileMenu";
 
 export function TopBar() {
   const title = useStore((s) => s.project.title);
@@ -29,7 +30,7 @@ export function TopBar() {
   const [modelsOpen, setModelsOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [currentSave, setCurrentSave] = useState("test");
+  const [currentSave, setCurrentSave] = useState("");
   const [diskFile, setDiskFile] = useState<{ name: string; needsPermission: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -40,6 +41,13 @@ export function TopBar() {
     const t = setInterval(tick, 800);
     tick();
     return () => clearInterval(t);
+  }, []);
+
+  // Ctrl+H (from the keyboard-shortcut hook) asks the store to open Versions
+  useEffect(() => {
+    const openVersions = () => setVersionsOpen(true);
+    document.addEventListener("bw:versions-open", openVersions);
+    return () => document.removeEventListener("bw:versions-open", openVersions);
   }, []);
 
   const activeModel =
@@ -70,6 +78,62 @@ export function TopBar() {
       checkpoint("Reconnected disk file");
     }
   };
+
+  const fileItems: FileMenuItem[] = [
+    {
+      id: "save",
+      label: "Save",
+      hint: `Checkpoint to “${currentSave || "…"}”`,
+      shortcut: "Ctrl+S",
+      onSelect: () => {
+        checkpoint("Manual save");
+        showToast(`Saved to “${currentSave}” ✓`);
+      },
+    },
+    {
+      id: "save-as",
+      label: "Save as / switch save…",
+      hint: currentSave ? `Active save: ${currentSave}` : undefined,
+      onSelect: () => setSaveOpen(true),
+    },
+    {
+      id: "versions",
+      label: "Version history…",
+      shortcut: "Ctrl+H",
+      onSelect: () => setVersionsOpen(true),
+    },
+    {
+      id: "disk",
+      label:
+        diskFile?.needsPermission
+          ? `Reconnect ${diskFile.name}`
+          : diskFile
+            ? `Autosave file: ${diskFile.name}`
+            : "Link to disk file…",
+      hint:
+        diskFile && !diskFile.needsPermission
+          ? "Autosave is writing to this file"
+          : "Mirror autosaves to a .json on your disk",
+      dividerAbove: true,
+      disabled: Boolean(diskFile && !diskFile.needsPermission) || (!diskFile && !diskLinkSupported()),
+      onSelect: () =>
+        void (diskFile?.needsPermission ? reconnectDisk() : linkDisk()),
+    },
+    {
+      id: "export",
+      label: "Export JSON…",
+      hint: "Download a portable copy of this project",
+      shortcut: "Ctrl+E",
+      dividerAbove: true,
+      onSelect: () => downloadProjectJson(),
+    },
+    {
+      id: "import",
+      label: "Import JSON…",
+      hint: "Load a Branchwork project file into the canvas",
+      onSelect: () => fileInputRef.current?.click(),
+    },
+  ];
 
   return (
     <header className="bw-topbar">
@@ -124,14 +188,6 @@ export function TopBar() {
         <button className="btn btn-small" onClick={() => setModelsOpen(true)} title="Configure providers, keys and endpoints">
           ⚙ Models
         </button>
-        {diskFile && !diskFile.needsPermission && (
-          <span
-            className="bw-disk-chip"
-            title={`Autosaving to ${diskFile.name} in addition to local storage`}
-          >
-            💾 {diskFile.name}
-          </span>
-        )}
         {diskFile?.needsPermission && (
           <button
             className="btn btn-small bw-disk-reconnect"
@@ -141,39 +197,7 @@ export function TopBar() {
             🔗 Reconnect {diskFile.name}
           </button>
         )}
-        {!diskFile && diskLinkSupported() && (
-          <button
-            className="btn btn-small"
-            title="Autosave to a .json file on your disk (in addition to local storage)"
-            onClick={() => void linkDisk()}
-          >
-            🔗 Link to disk…
-          </button>
-        )}
-        <button
-          className="btn btn-small bw-save-btn"
-          onClick={() => {
-            checkpoint("Manual save");
-            showToast(`Saved to "${currentSave}" ✓`);
-          }}
-          title={`Save now to saves/${currentSave}/ (Ctrl+S)`}
-        >
-          💾 Save
-        </button>
-        <button
-          className="btn btn-small bw-disk-chip bw-disk-chip-btn"
-          title="Pick or switch save folders"
-          onClick={() => setSaveOpen(true)}
-        >
-          📂 {currentSave} ▾
-        </button>
-        <button
-          className="btn btn-small"
-          onClick={() => setVersionsOpen(true)}
-          title="Version history (stored in this browser)"
-        >
-          🕘 Versions
-        </button>
+        <FileMenu items={fileItems} />
         <button className="btn btn-small" onClick={undo} title="Undo (Ctrl/⌘+Z)">
           ↺
         </button>
@@ -186,16 +210,6 @@ export function TopBar() {
           title="Lay out selected branch (Ctrl/⌘+L)"
         >
           ⌗ Layout branch
-        </button>
-        <button
-          className="btn btn-small"
-          onClick={downloadProjectJson}
-          title="Export project JSON (Ctrl/⌘+E)"
-        >
-          ⇩ Export
-        </button>
-        <button className="btn btn-small" onClick={() => fileInputRef.current?.click()}>
-          ⇧ Import
         </button>
         <input
           ref={fileInputRef}
@@ -212,7 +226,13 @@ export function TopBar() {
         />
       </div>
       {modelsOpen && <ModelSettingsModal onClose={() => setModelsOpen(false)} />}
-      {versionsOpen && <VersionsModal onClose={() => setVersionsOpen(false)} />}
+      {versionsOpen && (
+        <VersionsModal
+          onClose={() => {
+            setVersionsOpen(false);
+          }}
+        />
+      )}
       {saveOpen && (
         <SaveModal
           onClose={() => {

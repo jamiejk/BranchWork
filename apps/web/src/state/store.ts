@@ -123,6 +123,8 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
 
   exportBundleJson: () => string;
   showToast: (message: string | null) => void;
+  /** opens the version-history modal (Ctrl+H / File menu); Workspace listens via subscription */
+  setVersionsOpen: (open: boolean) => void;
 }
 
 const undoStack: Snapshot[] = [];
@@ -169,6 +171,12 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     if (message !== null) {
       toastTimer = setTimeout(() => set({ toast: null }), 3200);
     }
+  },
+
+  // Modal open-state lives outside the store normally (local component state),
+  // but keyboard shortcuts need a way to open the Versions modal from anywhere.
+  setVersionsOpen(open) {
+    document.dispatchEvent(new CustomEvent("bw:versions-open", { detail: open }));
   },
 
   loadFromBundle(data) {

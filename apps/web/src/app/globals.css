@@ -191,6 +191,43 @@ body {
   gap: 6px;
 }
 
+/* ---------- File dropdown menu ---------- */
+
+.bw-file-btn-open {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bw-file-menu {
+  min-width: 280px;
+  max-height: none;
+  overflow: visible;
+}
+.bw-file-menu-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 5px 8px;
+}
+.bw-file-menu .bw-ctx-item-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+}
+.bw-file-menu-kbd {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bw-file-menu .bw-ctx-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.bw-file-item-danger .bw-ctx-item-title {
+  color: var(--danger, #a33);
+}
+
 .btn {
   border: 1px solid var(--line);
   background: #fff;
