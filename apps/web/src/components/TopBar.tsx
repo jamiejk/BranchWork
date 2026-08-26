@@ -93,7 +93,6 @@ export function TopBar() {
     {
       id: "new",
       label: "New…",
-      hint: "Fresh canvas in its own save folder; current project stays safe",
       shortcut: "Ctrl+N",
       onSelect: () => setNewOpen(true),
     },

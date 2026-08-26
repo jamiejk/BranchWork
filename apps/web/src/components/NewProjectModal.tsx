@@ -52,9 +52,7 @@ export function NewProjectModal({
           </button>
         </header>
         <p className="bw-modal-sub">
-          Starts a fresh canvas with a single opening-question card. Your current
-          project stays safe in its own save folder — switch back any time via
-          File → Save as / switch save.
+          Starts a fresh canvas with a single opening-question card.
         </p>
 
         <div className="bw-save-new">
