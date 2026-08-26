@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "An open-source spatial writing and research environment. Nonlinear thinking upstream; linear writing downstream; provenance preserved throughout.",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "workspaces": [
     "apps/*",
     "packages/*"
