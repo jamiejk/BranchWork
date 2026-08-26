@@ -75,7 +75,7 @@ packages/domain                 Zod schemas & types: nodes, edges, sources, manu
 packages/graph                  Traversal, ancestry rules, collapse, Dagre layout, context assembly
 packages/models                 Adapter interface, roles, registry, mock + OpenAI-compatible providers
 docs/decisions                  Architecture decision records
-docs/product                    Concept document
+docs/product                    Concept document; search & background-task guide
 ```
 
 ## Storage & privacy model

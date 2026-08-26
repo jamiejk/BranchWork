@@ -91,7 +91,7 @@ export function ModelSettingsModal({ onClose }: { onClose: () => void }) {
 
         <div className="bw-field" style={{ marginTop: 10 }}>
           <label className="bw-field">
-            Background tasks (source &amp; entity extraction)
+            Background tasks (extraction &amp; search queries)
             <select
               value={settings.extractionModelId ?? ""}
               onChange={(e) =>
@@ -110,7 +110,8 @@ export function ModelSettingsModal({ onClose }: { onClose: () => void }) {
             </select>
           </label>
           <p className="bw-muted">
-            Tip: point this at a small local model (e.g. Gemma/Gemini via Ollama) — extraction runs often and cheap is fine.
+            Used for source/entity extraction and generating web search queries.
+            A small local model works well — see docs/product/search-and-background-tasks.md.
           </p>
         </div>
 
