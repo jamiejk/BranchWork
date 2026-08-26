@@ -64,6 +64,7 @@ function CanvasInner() {
   const selectedNodeIds = useStore((s) => s.selectedNodeIds);
   const selectedEdgeId = useStore((s) => s.selectedEdgeId);
   const editingNodeId = useStore((s) => s.editingNodeId);
+  const titleEditNodeId = useStore((s) => s.titleEditNodeId);
   const streamingRunIds = useStore((s) => s.streamingRunIds);
   const backgroundBusyIds = useStore((s) => s.backgroundBusyIds);
   const storedViewport = useStore((s) => s.viewport);
@@ -103,6 +104,7 @@ function CanvasInner() {
             modelRunId: node.modelRunId,
             selected: selectedNodeIds.includes(node.id),
             editing: editingNodeId === node.id,
+            titleEditing: titleEditNodeId === node.id,
             collapsed: Boolean(collapsedIds[node.id]),
             hiddenDescendants: childCountByParent.get(node.id) ?? 0,
             streaming: Boolean(node.modelRunId && streamingRunSet.has(node.modelRunId)),
@@ -128,6 +130,7 @@ function CanvasInner() {
       hiddenIds,
       selectedNodeIds,
       editingNodeId,
+      titleEditNodeId,
       collapsedIds,
       childCountByParent,
       streamingRunSet,

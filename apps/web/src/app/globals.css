@@ -438,10 +438,21 @@ body {
   font-weight: 600;
   line-height: 1.35;
   margin-bottom: 3px;
-  cursor: grab;
+  cursor: text;
   border-radius: 4px;
 }
 .bw-card-title:hover {
+  background: rgba(58, 110, 165, 0.08);
+  outline: 1px dashed var(--accent-soft);
+}
+/* empty-state affordances: ADD TITLE / ADD BODY TEXT */
+.bw-field-empty {
+  color: color-mix(in srgb, var(--ink-soft) 62%, transparent);
+  font-style: italic;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.bw-field-empty:hover {
   background: rgba(58, 110, 165, 0.08);
   outline: 1px dashed var(--accent-soft);
 }

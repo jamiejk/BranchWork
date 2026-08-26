@@ -25,6 +25,7 @@ export interface ResearchNodeData {
   modelRunId?: string;
   selected: boolean;
   editing: boolean;
+  titleEditing: boolean;
   collapsed: boolean;
   hiddenDescendants: number;
   streaming: boolean;
@@ -51,7 +52,6 @@ function ResearchNodeShellInner({ data }: NodeProps) {
   const store = useStore;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const [titleEditing, setTitleEditing] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [resizing, setResizing] = useState(false);
   const hoverTimer = useRef<number | undefined>(undefined);
@@ -82,18 +82,20 @@ function ResearchNodeShellInner({ data }: NodeProps) {
   };
 
   useEffect(() => {
-    if (!card.editing) return;
+    if (!card.editing && !card.titleEditing) return;
     let frames = 0;
     let raf = 0;
     // React Flow keeps fresh nodes visibility:hidden until measured, so focus()
     // can silently fail; retry until activeElement really is the editor.
     const attempt = () => {
-      const el = textareaRef.current;
+      const el = card.editing ? textareaRef.current : titleInputRef.current;
       if (el && el.isConnected) {
         el.focus();
         if (document.activeElement === el) {
-          const len = el.value.length;
-          el.setSelectionRange(len, len);
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+          }
           return;
         }
       }
@@ -101,7 +103,7 @@ function ResearchNodeShellInner({ data }: NodeProps) {
     };
     raf = requestAnimationFrame(attempt);
     return () => cancelAnimationFrame(raf);
-  }, [card.editing]);
+  }, [card.editing, card.titleEditing]);
 
   const commitEdit = () => {
     const state = store.getState();
@@ -110,45 +112,38 @@ function ResearchNodeShellInner({ data }: NodeProps) {
     const value = textareaRef.current?.value ?? "";
     const node = state.nodes[card.nodeId];
 
-    // Title is always filled immediately from the first line so the card
-    // never looks blank; the background model may replace it with a better
-    // one shortly after.
-    const nextTitle = value.split("\n")[0]?.slice(0, 110) || "";
-    let content = value;
-    if (nextTitle && content.startsWith(nextTitle)) {
-      content = content.slice(nextTitle.length).replace(/^\s+/, "");
-    }
-
-    if (node && node.title === nextTitle && node.content === content) {
+    // Title is a separate field now — the body editor never touches it.
+    if (!node || node.content === value) {
       state.setEditingNode(null);
       return;
     }
-    state.updateNode(card.nodeId, { title: nextTitle, content });
+    state.updateNode(card.nodeId, { content: value });
     state.setEditingNode(null);
     state.setSelectedNodes([card.nodeId]);
 
     // Ask the background model to propose a sharper title (fire-and-forget).
-    // generateTitle only overwrites if the user hasn't edited it meanwhile.
-    // Skip refinement when the note is just its title line — a short
-    // deliberate name like "Elizabeth Loftus" must not be replaced.
-    if (nextTitle.trim() && content.trim()) {
+    // generateTitle only overwrites if the user hasn't edited it meanwhile,
+    // and no-ops while the title is still empty — an untouched title stays
+    // under the user's control.
+    if (value.trim()) {
       void store.getState().generateTitle(card.nodeId);
     }
   };
 
   const commitTitle = () => {
-    const el = titleInputRef.current;
-    if (!el) return;
-    const next = el.value.trim().slice(0, 110);
-    const node = store.getState().nodes[card.nodeId];
-    setTitleEditing(false);
+    const state = store.getState();
+    // ignore stale blur events after the input already closed
+    if (state.titleEditNodeId !== card.nodeId) return;
+    const next = titleInputRef.current?.value.trim().slice(0, 110) ?? "";
+    state.setTitleEditNode(null);
+    const node = state.nodes[card.nodeId];
     if (!node || node.title === next) return;
-    store.getState().updateNode(card.nodeId, { title: next });
+    state.updateNode(card.nodeId, { title: next });
   };
 
-  const bodyText =
-    card.plainText.trim() || derivePlainText(card.content).trim() || "Empty card — double-click to write.";
+  const bodyText = card.plainText.trim() || derivePlainText(card.content ?? "").trim();
   const richBody = (card.content ?? "").trim() !== "" ? <RichText text={card.content} /> : null;
+  const hasBody = Boolean(richBody || bodyText);
 
   return (
     <>
@@ -238,7 +233,7 @@ function ResearchNodeShellInner({ data }: NodeProps) {
         </div>
       ) : (
         <div className="bw-card-body">
-          {titleEditing ? (
+          {card.titleEditing ? (
             <input
               ref={titleInputRef}
               className="bw-title-input nodrag nowheel"
@@ -251,7 +246,7 @@ function ResearchNodeShellInner({ data }: NodeProps) {
                   commitTitle();
                 } else if (e.key === "Escape" && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  setTitleEditing(false);
+                  store.getState().setTitleEditNode(null);
                 }
                 e.stopPropagation();
               }}
@@ -259,20 +254,31 @@ function ResearchNodeShellInner({ data }: NodeProps) {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            card.title && (
-              <div
-                className="bw-card-title"
-                title="Click to edit the title (body is edited separately) — drag to move the card"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTitleEditing(true);
-                }}
-              >
-                {card.title}
-              </div>
-            )
+            <div
+              className={`bw-card-title nodrag nowheel${card.title ? "" : " bw-field-empty"}`}
+              title="Click to edit the title"
+              onClick={(e) => {
+                e.stopPropagation();
+                store.getState().setTitleEditNode(card.nodeId);
+              }}
+            >
+              {card.title || "ADD TITLE"}
+            </div>
           )}
-          <div className="bw-card-text">{richBody ?? bodyText}</div>
+          {hasBody ? (
+            <div className="bw-card-text">{richBody ?? bodyText}</div>
+          ) : (
+            <div
+              className="bw-card-text bw-field-empty nodrag nowheel"
+              title="Click to write the body"
+              onClick={(e) => {
+                e.stopPropagation();
+                store.getState().setEditingNode(card.nodeId);
+              }}
+            >
+              ADD BODY TEXT
+            </div>
+          )}
         </div>
       )}
 
@@ -352,6 +358,7 @@ export const ResearchNodeShell = memo(ResearchNodeShellInner, (a, b) => {
     prev.modelRunId === next.modelRunId &&
     prev.selected === next.selected &&
     prev.editing === next.editing &&
+    prev.titleEditing === next.titleEditing &&
     prev.collapsed === next.collapsed &&
     prev.hiddenDescendants === next.hiddenDescendants &&
     prev.streaming === next.streaming &&

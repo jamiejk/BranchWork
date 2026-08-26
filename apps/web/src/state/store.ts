@@ -66,6 +66,7 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
   selectedEdgeId: EdgeId | null;
   collapsedIds: Record<NodeId, true>;
   editingNodeId: NodeId | null;
+  titleEditNodeId: NodeId | null;
   viewport: Viewport | null;
   activeTab: "canvas" | "manuscript";
   contextPreview: ContextPreviewState | null;
@@ -107,6 +108,7 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
   setSelectedNodes: (ids: NodeId[]) => void;
   setSelectedEdge: (id: EdgeId | null) => void;
   setEditingNode: (id: NodeId | null) => void;
+  setTitleEditNode: (id: NodeId | null) => void;
   setViewport: (viewport: Viewport) => void;
   toggleCollapse: (id: NodeId) => void;
 
@@ -148,6 +150,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
   selectedEdgeId: null,
   collapsedIds: {},
   editingNodeId: null,
+  titleEditNodeId: null,
   viewport: null,
   activeTab: "canvas",
   contextPreview: null,
@@ -196,6 +199,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
       selectedEdgeId: null,
       collapsedIds: {},
       editingNodeId: null,
+      titleEditNodeId: null,
       loaded: true,
     });
     return true;
@@ -285,6 +289,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
       selectedNodeIds: [root.id],
       collapsedIds: {},
       editingNodeId: null,
+      titleEditNodeId: null,
       contextPreview: null,
       streamingRunIds: [],
       loaded: true,
@@ -356,7 +361,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     set((st) => ({
       nodes: { ...st.nodes, [child.id]: child },
       edges: { ...st.edges, [edge.id]: edge },
-      editingNodeId: child.id,
+      titleEditNodeId: child.id,
     }));
     return child.id;
   },
@@ -387,7 +392,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     set((st) => ({
       nodes: { ...st.nodes, [sibling.id]: sibling },
       edges: { ...st.edges, [edge.id]: edge },
-      editingNodeId: sibling.id,
+      titleEditNodeId: sibling.id,
     }));
     return sibling.id;
   },
@@ -402,7 +407,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     });
     set((st) => ({
       nodes: { ...st.nodes, [node.id]: node },
-      editingNodeId: node.id,
+      titleEditNodeId: node.id,
     }));
     return node.id;
   },
@@ -503,6 +508,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
       edges,
       selectedNodeIds: st.selectedNodeIds.filter((x) => !idSet.has(x)),
       editingNodeId: st.editingNodeId && idSet.has(st.editingNodeId) ? null : st.editingNodeId,
+      titleEditNodeId: st.titleEditNodeId && idSet.has(st.titleEditNodeId) ? null : st.titleEditNodeId,
     }));
   },
 
@@ -562,6 +568,10 @@ export const useStore = create<BranchworkState>()((set, get) => ({
 
   setEditingNode(id) {
     set({ editingNodeId: id });
+  },
+
+  setTitleEditNode(id) {
+    set({ titleEditNodeId: id });
   },
 
   setViewport(viewport) {
