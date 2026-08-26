@@ -1,16 +1,32 @@
 import { z } from "zod";
 import { newNodeId } from "./ids";
-import { authorKindSchema, nodeStatusSchema, nodeTypeSchema } from "./node-types";
+import {
+  authorKindSchema,
+  nodeStatusSchema,
+  nodeTypeSchema,
+  CUSTOM_TYPE_PREFIX,
+} from "./node-types";
 import { positionSchema, sizeSchema } from "./position";
 import type { AuthorKind, NodeStatus, NodeType } from "./node-types";
 import type { NodeId, ProjectId } from "./ids";
 
 const isoTimestamp = z.string().min(1);
 
+/**
+ * Card type as stored: a built-in type or `custom:<id>` referencing the
+ * project's customCardTypes list.
+ */
+export const storedNodeTypeSchema = z.union([
+  nodeTypeSchema,
+  z.string().regex(new RegExp(`^${CUSTOM_TYPE_PREFIX}[a-z0-9_-]{1,40}$`)),
+]);
+
+export type StoredNodeType = z.infer<typeof storedNodeTypeSchema>;
+
 export const researchNodeSchema = z.object({
   id: z.string().min(1),
   projectId: z.string().min(1),
-  type: nodeTypeSchema,
+  type: storedNodeTypeSchema,
   title: z.string().default(""),
   content: z.string().default(""),
   plainText: z.string().default(""),
@@ -43,7 +59,7 @@ export function derivePlainText(content: string): string {
 
 export interface CreateResearchNodeInput {
   projectId: ProjectId;
-  type: NodeType;
+  type: StoredNodeType;
   id?: NodeId;
   title?: string;
   content?: string;
@@ -79,7 +95,7 @@ export function createResearchNode(input: CreateResearchNodeInput): ResearchNode
 }
 
 export interface ResearchNodePatch {
-  type?: NodeType;
+  type?: StoredNodeType;
   title?: string;
   content?: string;
   plainText?: string;

@@ -3,11 +3,11 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import {
-  NODE_TYPE_REGISTRY,
+  cardTypeMeta,
   NODE_STATUS_META,
   derivePlainText,
   type NodeId,
-  type NodeType,
+  type StoredNodeType,
   type NodeStatus,
   type AuthorKind,
 } from "@branchwork/domain";
@@ -16,7 +16,7 @@ import { RichText } from "../../lib/richtext";
 
 export interface ResearchNodeData {
   nodeId: NodeId;
-  type: NodeType;
+  type: StoredNodeType;
   title: string;
   content: string;
   plainText: string;
@@ -37,7 +37,7 @@ function statusDotClass(status: NodeStatus): string {
   return `bw-status-dot bw-status-${status}`;
 }
 
-const TYPE_CLASS: Partial<Record<NodeType, string>> = {
+const TYPE_CLASS: Partial<Record<string, string>> = {
   question: "bw-type-question",
   claim: "bw-type-claim",
   counterclaim: "bw-type-counterclaim",
@@ -181,7 +181,9 @@ function ResearchNodeShellInner({ data }: NodeProps) {
         {/* header is a grab surface; only its buttons opt out of dragging */}
         <div className="bw-card-header">
         <span className={`bw-chip ${TYPE_CLASS[card.type] ?? ""}`}>
-          {NODE_TYPE_REGISTRY[card.type].label}
+          {useStore.getState().project.customCardTypes
+            ? cardTypeMeta(card.type, useStore.getState().project.customCardTypes).label
+            : card.type}
         </span>
         <span className={statusDotClass(card.status)} title={`Status: ${NODE_STATUS_META[card.status].label}`} />
         {card.authorKind === "model" && (

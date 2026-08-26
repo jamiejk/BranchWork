@@ -4,7 +4,7 @@
 // post-stream source extraction. Pure orchestration lives here; the store
 // composes it in.
 
-import { NODE_TYPE_REGISTRY } from "@branchwork/domain";
+import { cardTypeMeta } from "@branchwork/domain";
 import {
   globalRegistry,
   ROLE_PRESETS,
@@ -132,7 +132,7 @@ export function createModelRunActions(set: SetFn, get: GetFn): ModelRunActions {
 
         // Card subject: title + type + body. A one-liner card keeps its text
         // in the title, so the title is the most important part of the source.
-        const typeLabel = NODE_TYPE_REGISTRY[parent.type]?.label ?? parent.type;
+        const typeLabel = cardTypeMeta(parent.type, s.project.customCardTypes ?? []).label;
         const body = (parent.content || "").slice(0, 4000);
         const subject = [`Card: ${parent.title} (type: ${typeLabel})`, body && `Body:\n${body}`]
           .filter(Boolean)

@@ -241,6 +241,28 @@ body {
   color: var(--danger, #a33);
 }
 
+/* new card-type inline input (canvas menu + inspector) */
+.bw-ctx-newtype,
+.bw-newtype-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.bw-ctx-newtype input,
+.bw-newtype-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.bw-ctx-newtype input:focus,
+.bw-newtype-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .btn {
   border: 1px solid var(--line);
   background: #fff;

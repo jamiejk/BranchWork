@@ -15,7 +15,7 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 import { computeHiddenNodeIds, DEFAULT_CARD_WIDTH } from "@branchwork/graph";
-import { NODE_TYPES, NODE_TYPE_REGISTRY, type EdgeId, type NodeType } from "@branchwork/domain";
+import { NODE_TYPES, cardTypeMeta, customTypeId, type EdgeId } from "@branchwork/domain";
 import { useStore } from "../../state/store";
 import { setRfInstance } from "../../lib/rf";
 import { ResearchNodeShell, type ResearchNodeData } from "./ResearchNodeShell";
@@ -37,6 +37,9 @@ function CanvasInner() {
     breakOut?: { sourceNodeId: string; text: string };
   } | null>(null);
   const pendingConnect = useRef<{ sourceId: string; sourceHandle: string | null } | null>(null);
+  const customTypes = useStore((s) => s.project.customCardTypes ?? []);
+  const [ctxNewType, setCtxNewType] = useState(false);
+  const [ctxTypeDraft, setCtxTypeDraft] = useState("");
   /** Last non-empty text selection inside a card, captured on selectionchange
    *  because the right-click itself collapses the live selection. */
   const lastCardSelection = useRef<{ nodeId: string; text: string } | null>(null);
@@ -237,7 +240,7 @@ function CanvasInner() {
   );
 
   const createFromMenu = useCallback(
-    (type: NodeType) => {
+    (type: string) => {
       if (!ctxMenu) return;
       const state = useStore.getState();
       const newNodeId = state.createNodeAt(type, { x: ctxMenu.flowX, y: ctxMenu.flowY });
@@ -248,9 +251,28 @@ function CanvasInner() {
         });
       }
       setCtxMenu(null);
+      setCtxNewType(false);
+      setCtxTypeDraft("");
     },
     [ctxMenu]
   );
+
+  /** Define a new project card type and immediately place a card of it. */
+  const commitCtxNewType = useCallback(() => {
+    if (!ctxMenu || !ctxTypeDraft.trim()) return;
+    const state = useStore.getState();
+    const created = state.addCustomCardType(ctxTypeDraft);
+    setCtxNewType(false);
+    setCtxTypeDraft("");
+    if (!created) return;
+    const newNodeId = state.createNodeAt(created, { x: ctxMenu.flowX, y: ctxMenu.flowY });
+    if (ctxMenu.connect) {
+      state.connectNodes(ctxMenu.connect.sourceId, newNodeId, {
+        sourceHandle: ctxMenu.connect.sourceHandle,
+      });
+    }
+    setCtxMenu(null);
+  }, [ctxMenu, ctxTypeDraft]);
 
   const breakOutFromMenu = useCallback(() => {
     if (!ctxMenu?.breakOut) return;
@@ -394,10 +416,58 @@ function CanvasInner() {
             )}
             {NODE_TYPES.map((type) => (
               <button key={type} className="bw-ctx-item" onClick={() => createFromMenu(type)}>
-                <span className="bw-ctx-item-title">{NODE_TYPE_REGISTRY[type].label}</span>
-                <span className="bw-ctx-item-hint">{NODE_TYPE_REGISTRY[type].hint}</span>
+                <span className="bw-ctx-item-title">{cardTypeMeta(type, customTypes).label}</span>
+                <span className="bw-ctx-item-hint">{cardTypeMeta(type, customTypes).hint}</span>
               </button>
             ))}
+            {(customTypes ?? []).length > 0 && <div className="bw-ctx-divider" />}
+            {(customTypes ?? []).map((c) => (
+              <button
+                key={c.id}
+                className="bw-ctx-item"
+                onClick={() => createFromMenu(customTypeId(c.id))}
+              >
+                <span className="bw-ctx-item-title">{c.label}</span>
+                <span className="bw-ctx-item-hint">{c.hint || "Project card type"}</span>
+              </button>
+            ))}
+            <div className="bw-ctx-divider" />
+            {ctxNewType ? (
+              <div className="bw-ctx-newtype">
+                <input
+                  autoFocus
+                  value={ctxTypeDraft}
+                  placeholder="Type name, e.g. Scene"
+                  aria-label="New card type name"
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setCtxNewType(false);
+                      setCtxTypeDraft("");
+                    } else if (e.key === "Enter" && !e.nativeEvent.isComposing && ctxTypeDraft.trim()) {
+                      commitCtxNewType();
+                    }
+                  }}
+                  onChange={(e) => setCtxTypeDraft(e.target.value)}
+                />
+                <button
+                  className="btn btn-small btn-primary"
+                  disabled={!ctxTypeDraft.trim()}
+                  onClick={commitCtxNewType}
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                className="bw-ctx-item"
+                onClick={() => {
+                  setCtxNewType(true);
+                }}
+              >
+                <span className="bw-ctx-item-title">＋ New card type…</span>
+                <span className="bw-ctx-item-hint">Define a reusable type for this project</span>
+              </button>
+            )}
           </div>
         </div>
       )}

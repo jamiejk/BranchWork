@@ -13,7 +13,10 @@ import {
   createExportBundle,
   createResearchEdge,
   createResearchNode,
+  customTypeId,
+  slugifyTypeLabel,
   updateResearchNode,
+  type CustomCardType,
   type EdgeId,
   type EdgeType,
   type Manuscript,
@@ -80,6 +83,10 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
   seedDemoProject: () => void;
   /** Blank-slate project: untitled, single root question card. */
   newEmptyProject: () => void;
+  /** Register a project-defined card type; returns its `custom:<id>` form. */
+  addCustomCardType: (label: string) => string | null;
+  /** Remove a custom card type; cards using it fall back to `note`. */
+  removeCustomCardType: (id: string) => void;
 
   setActiveModel: (modelId: string | null) => void;
   updateModelSettings: (settings: ModelSettings) => void;
@@ -90,7 +97,7 @@ export interface BranchworkState extends ModelRunActions, ManuscriptActions {
 
   addChildNode: (parentId: NodeId, overrides?: { type?: NodeType }) => NodeId | null;
   addSiblingNode: (nodeId: NodeId) => NodeId | null;
-  createNodeAt: (type: NodeType, position: { x: number; y: number }) => NodeId;
+  createNodeAt: (type: string, position: { x: number; y: number }) => NodeId;
   breakOutSelection: (sourceId: NodeId, text: string) => NodeId | null;
   updateNode: (
     id: NodeId,
@@ -142,7 +149,7 @@ ensureDefaultProviders();
 registerGenerationAdapter(() => useStore.getState().modelSettings);
 
 export const useStore = create<BranchworkState>()((set, get) => ({
-  project: { id: "p_bootstrap", title: "", createdAt: "", updatedAt: "" },
+  project: { id: "p_bootstrap", title: "", customCardTypes: [], createdAt: "", updatedAt: "" },
   nodes: {},
   edges: {},
   manuscripts: {},
@@ -226,6 +233,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     const project: Project = {
       id: `p_${uuid.replace(/-/g, "").slice(0, 8)}`,
       title: "",
+      customCardTypes: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -259,6 +267,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     const project: Project = {
       id: "p_demo",
       title: "Remote work & productivity",
+      customCardTypes: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -364,6 +373,48 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     set((s) => ({ project: { ...s.project, title, updatedAt: new Date().toISOString() } }));
   },
 
+  /** Register a project-defined card type; returns its `custom:<id>` form. */
+  addCustomCardType(label: string): string | null {
+    const trimmed = label.trim().slice(0, 60);
+    if (!trimmed) return null;
+    const custom = get().project.customCardTypes ?? [];
+    const existingIds = new Set(custom.map((c) => c.id));
+    const base = slugifyTypeLabel(label);
+    let id = base;
+    let n = 2;
+    while (existingIds.has(id)) {
+      // same slug for a different label: still a distinct type
+      id = `${base}-${n++}`;
+    }
+    set((s) => ({
+      project: {
+        ...s.project,
+        customCardTypes: [...(s.project.customCardTypes ?? []), { id, label: trimmed, hint: "" }],
+        updatedAt: new Date().toISOString(),
+      },
+    }));
+    return customTypeId(id);
+  },
+
+  /** Remove a custom card type; cards using it fall back to `note`. */
+  removeCustomCardType(id: string): void {
+    set((s) => {
+      const typeId = customTypeId(id);
+      const nodes = { ...s.nodes };
+      for (const [nodeId, node] of Object.entries(nodes)) {
+        if (node.type === typeId) nodes[nodeId] = { ...node, type: "note", updatedAt: new Date().toISOString() };
+      }
+      return {
+        project: {
+          ...s.project,
+          customCardTypes: (s.project.customCardTypes ?? []).filter((c) => c.id !== id),
+          updatedAt: new Date().toISOString(),
+        },
+        nodes,
+      };
+    });
+  },
+
   setActiveTab(tab) {
     set({ activeTab: tab });
   },
@@ -452,7 +503,7 @@ export const useStore = create<BranchworkState>()((set, get) => ({
     s.pushHistory();
     const node = createResearchNode({
       projectId: s.project.id,
-      type,
+      type: type as Parameters<typeof createResearchNode>[0]["type"],
       position,
     });
     set((st) => ({

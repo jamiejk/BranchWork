@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { newProjectId } from "./ids";
+import { customCardTypeSchema } from "./node-types";
 import type { NodeId, ProjectId } from "./ids";
 
 const isoTimestamp = z.string().min(1);
@@ -8,6 +9,7 @@ export const projectSchema = z.object({
   id: z.string().min(1),
   title: z.string().default("Untitled project"),
   rootNodeId: z.string().optional(),
+  customCardTypes: z.array(customCardTypeSchema).default([]),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 });

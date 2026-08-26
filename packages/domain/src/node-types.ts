@@ -23,6 +23,18 @@ export type NodeType = (typeof NODE_TYPES)[number];
 
 export const nodeTypeSchema = z.enum(NODE_TYPES);
 
+/**
+ * User-defined card types, stored per-project. The id is a slug derived from
+ * the label; cards reference it as `custom:<id>`.
+ */
+export const customCardTypeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9_-]{1,40}$/),
+  label: z.string().min(1).max(60),
+  hint: z.string().max(120).default(""),
+});
+
+export type CustomCardType = z.infer<typeof customCardTypeSchema>;
+
 export const NODE_STATUSES = ["draft", "reviewed", "verified", "disputed", "excluded"] as const;
 
 export type NodeStatus = (typeof NODE_STATUSES)[number];
@@ -34,6 +46,17 @@ export const AUTHOR_KINDS = ["human", "model", "import"] as const;
 export type AuthorKind = (typeof AUTHOR_KINDS)[number];
 
 export const authorKindSchema = z.enum(AUTHOR_KINDS);
+
+/** Prefix identifying a card type as project-defined: `custom:<id>`. */
+export const CUSTOM_TYPE_PREFIX = "custom:";
+
+export function isCustomTypeId(type: string): boolean {
+  return type.startsWith(CUSTOM_TYPE_PREFIX);
+}
+
+export function customTypeId(id: string): string {
+  return `${CUSTOM_TYPE_PREFIX}${id}`;
+}
 
 export interface NodeTypeMeta {
   label: string;
@@ -66,3 +89,57 @@ export const NODE_STATUS_META: Record<NodeStatus, { label: string }> = {
   disputed: { label: "Disputed" },
   excluded: { label: "Excluded" },
 };
+
+/** Display metadata for any card type, built-in or project-custom. */
+export function cardTypeMeta(
+  type: string,
+  customTypes: CustomCardType[] = []
+): NodeTypeMeta {
+  if (!isCustomTypeId(type)) {
+    return (
+      NODE_TYPE_REGISTRY[type as NodeType] ?? { label: type, hint: "" }
+    );
+  }
+  const id = type.slice(CUSTOM_TYPE_PREFIX.length);
+  const found = customTypes.find((c) => c.id === id);
+  return found
+    ? { label: found.label, hint: found.hint }
+    : { label: id, hint: "" };
+}
+
+/** Slugify a user-typed label into a valid custom-type id. */
+export function slugifyTypeLabel(label: string): string {
+  return (
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "type"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validation against a project's custom types.
+//
+// Cards may carry either a built-in type or `custom:<id>` for an id declared
+// in the same bundle's project.customCardTypes. `nodeTypeSchema` alone still
+// validates built-ins (legacy callers); use this when the custom list is known.
+// ---------------------------------------------------------------------------
+
+const rawCardTypeSchema = z
+  .string()
+  .refine(
+    (t) => nodeTypeSchema.safeParse(t).success || isCustomTypeId(t),
+    { message: "unknown card type" }
+  );
+
+export function validateCardType(
+  type: string,
+  customTypes: CustomCardType[]
+): boolean {
+  if (!isCustomTypeId(type)) return nodeTypeSchema.safeParse(type).success;
+  const id = type.slice(CUSTOM_TYPE_PREFIX.length);
+  return customTypes.some((c) => c.id === id);
+}
+
+export { rawCardTypeSchema };

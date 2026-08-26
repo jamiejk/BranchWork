@@ -89,7 +89,7 @@ describe("branchworkExportFileSchema", () => {
       createdBy: "human",
     });
     const bundle = createExportBundle({
-      project: { id: projectId, title: "Test", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      project: { id: projectId, title: "Test", customCardTypes: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
       nodes: [n],
       edges: [e],
     });
@@ -97,5 +97,28 @@ describe("branchworkExportFileSchema", () => {
     expect(branchworkExportFileSchema.safeParse(JSON.parse(JSON.stringify(bundle))).success).toBe(
       true
     );
+  });
+
+  it("accepts a card whose type is a project-defined custom type and rejects undeclared ones", () => {
+    const customCardTypes = [{ id: "scene", label: "Scene", hint: "" }];
+    const n = researchNodeSchema.parse({
+      id: "n_scene1",
+      projectId,
+      type: "custom:scene",
+      title: "Opening scene",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const bundle = createExportBundle({
+      project: { id: projectId, title: "Script", customCardTypes, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      nodes: [n],
+    });
+    expect(branchworkExportFileSchema.safeParse(JSON.parse(JSON.stringify(bundle))).success).toBe(true);
+
+    // an undeclared custom id must fail validation
+    const rogue = { ...JSON.parse(JSON.stringify(n)), id: "n_rogue", type: "custom:nonexistent" };
+    const bad = JSON.parse(JSON.stringify(bundle));
+    bad.nodes = [rogue];
+    expect(branchworkExportFileSchema.safeParse(bad).success).toBe(false);
   });
 });
