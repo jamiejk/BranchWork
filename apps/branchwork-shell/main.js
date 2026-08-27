@@ -9,10 +9,10 @@ const path = require("node:path");
 // Override with BRANCHWORK_ROOT if you relocate the shell elsewhere.
 const ROOT = process.env.BRANCHWORK_ROOT || path.resolve(__dirname, "..", "..");
 
-const APP_URL = "http://branchwork.local:3210";
-// Spawn the repo's preflight script (port picking + next dev) directly via node.
-// Never pass a full command line to spawn(): it treats the whole string as one
-// executable name, which fails with `spawn npm run dev ENOENT`.
+const APP_URL = "http://localhost:3210";
+// Use localhost everywhere so storage is shared with the browser.
+// (branchwork.local was the old origin — storage is per origin, so
+//  a custom hostname splits the data away from browser sessions.)
 const NODE_BIN = require("fs").existsSync("/home/jamie/.local/bin/node")
   ? "/home/jamie/.local/bin/node"
   : "node";
