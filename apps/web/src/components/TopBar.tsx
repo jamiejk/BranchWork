@@ -7,9 +7,12 @@ import {
   downloadProjectJson,
   getCurrentSave,
   importProjectJson,
+  listRecentSaves,
   newProject,
   reconnectDiskFile,
   hasLinkedDiskFile,
+  switchToSave,
+  type RecentSave,
 } from "../state/persistence";
 import { diskLinkSupported, linkToDiskFile } from "../state/fileProject";
 import { ModelSettingsModal } from "./ModelSettingsModal";
@@ -17,6 +20,19 @@ import { VersionsModal } from "./VersionsModal";
 import { SaveModal } from "./SaveModal";
 import { NewProjectModal } from "./NewProjectModal";
 import { FileMenu, type FileMenuItem } from "./FileMenu";
+
+function timeAgo(ts: number): string {
+  const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  if (d === 1) return "yesterday";
+  if (d < 7) return `${d} d ago`;
+  return new Date(ts).toLocaleDateString();
+}
 
 export function TopBar() {
   const title = useStore((s) => s.project.title);
@@ -34,6 +50,7 @@ export function TopBar() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [currentSave, setCurrentSave] = useState("");
+  const [recents, setRecents] = useState<RecentSave[]>([]);
   const [diskFile, setDiskFile] = useState<{ name: string; needsPermission: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -45,6 +62,24 @@ export function TopBar() {
     tick();
     return () => clearInterval(t);
   }, []);
+
+  // recent saves for the File ▾ menu; refreshed whenever the active save
+  // changes (boot, switch, new project) or the window regains focus
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      void listRecentSaves(6)
+        .then((list) => {
+          if (alive) setRecents(list);
+        })
+        .catch(() => {});
+    load();
+    window.addEventListener("focus", load);
+    return () => {
+      alive = false;
+      window.removeEventListener("focus", load);
+    };
+  }, [currentSave]);
 
   // Ctrl+H (from the keyboard-shortcut hook) asks the store to open Versions
   useEffect(() => {
@@ -89,6 +124,18 @@ export function TopBar() {
     }
   };
 
+  const openSave = async (name: string) => {
+    if (name === currentSave) return;
+    if (await switchToSave(name)) {
+      setCurrentSave(name);
+      showToast(`Opened “${name}”.`);
+    } else {
+      showToast(`Could not open “${name}”.`);
+    }
+  };
+
+  const otherSaves = recents.filter((r) => !r.current);
+
   const fileItems: FileMenuItem[] = [
     {
       id: "new",
@@ -108,10 +155,40 @@ export function TopBar() {
     },
     {
       id: "save-as",
-      label: "Save as / switch save…",
+      label: "Save as…",
       hint: currentSave ? `Active save: ${currentSave}` : undefined,
       onSelect: () => setSaveOpen(true),
     },
+    // "Open recent": newest saves first, straight from the File menu.
+    // Only shown when at least one non-active save exists.
+    ...(otherSaves.length > 0
+      ? ([
+          {
+            id: "open-recent-header",
+            label: "Open recent",
+            dividerAbove: true,
+            header: true,
+            onSelect: () => {},
+          },
+          ...recents.map((r) => ({
+            id: `open-${r.name}`,
+            label: r.current ? `● ${r.name}` : r.name,
+            hint: r.current
+              ? "Active save"
+              : r.lastModified > 0
+                ? `saved ${timeAgo(r.lastModified)}`
+                : "open this save",
+            disabled: r.current,
+            onSelect: () => void openSave(r.name),
+          })),
+          {
+            id: "open-all",
+            label: "Browse all saves…",
+            hint: "Full list — switch, save-as, overwrite",
+            onSelect: () => setSaveOpen(true),
+          },
+        ] as FileMenuItem[])
+      : []),
     {
       id: "versions",
       label: "Version history…",

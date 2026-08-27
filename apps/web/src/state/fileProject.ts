@@ -71,6 +71,41 @@ export async function listSaves(): Promise<string[]> {
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
+export interface SaveInfo {
+  name: string;
+  /** epoch ms of the project file's last write (0 when only registry-known) */
+  lastModified: number;
+}
+
+/** All named saves with their project-file modification time, newest first. */
+export async function listSavesDetailed(): Promise<SaveInfo[]> {
+  const { getMeta } = await import("./idb");
+  const names = new Map<string, number>();
+  const registered = await getMeta<string[]>("saveList").catch(() => undefined);
+  for (const n of registered ?? []) names.set(sanitizeSaveName(n), 0);
+  try {
+    const dir = await savesDir(false);
+    const iterator = (dir as unknown as {
+      entries: () => AsyncIterableIterator<[string, FileSystemHandle]>;
+    }).entries();
+    for await (const [name, handle] of iterator) {
+      if (handle.kind !== "directory") continue;
+      try {
+        const fh = await (handle as FileSystemDirectoryHandle).getFileHandle(PROJECT_FILE);
+        const file = await fh.getFile();
+        names.set(sanitizeSaveName(name), file.lastModified);
+      } catch {
+        // folder without a project file: ignore
+      }
+    }
+  } catch {
+    // enumeration failed or no saves dir yet — registry still stands
+  }
+  return [...names]
+    .map(([name, lastModified]) => ({ name, lastModified }))
+    .sort((a, b) => b.lastModified - a.lastModified || a.name.localeCompare(b.name));
+}
+
 /** Remember a save name so listing stays reliable across OPFS quirks. */
 export async function registerSaveName(name: string): Promise<void> {
   const clean = sanitizeSaveName(name);

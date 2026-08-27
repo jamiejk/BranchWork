@@ -10,6 +10,8 @@ export interface FileMenuItem {
   danger?: boolean;
   disabled?: boolean;
   dividerAbove?: boolean;
+  /** renders as a non-interactive group heading instead of a menu entry */
+  header?: boolean;
   onSelect: () => void;
 }
 
@@ -98,6 +100,14 @@ export function FileMenu({
           <div className="bw-ctx-header">File</div>
           {items.map((item) => {
             if (item.dividerAbove) index = -2; // reset mnemonic-free zone (keeps map keys stable)
+            if (item.header) {
+              return (
+                <div key={item.id}>
+                  {item.dividerAbove && <div className="bw-file-menu-divider" />}
+                  <div className="bw-file-menu-group">{item.label}</div>
+                </div>
+              );
+            }
             return (
               <div key={item.id}>
                 {item.dividerAbove && <div className="bw-file-menu-divider" />}

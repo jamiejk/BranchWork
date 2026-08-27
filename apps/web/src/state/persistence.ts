@@ -50,6 +50,22 @@ export function getCurrentSave(): string {
   return currentSave;
 }
 
+export interface RecentSave {
+  name: string;
+  /** epoch ms of the save's project file last write (0 = registry-only entry) */
+  lastModified: number;
+  current: boolean;
+}
+
+/** Named saves sorted by project-file mtime, newest first (File ▾ "Open recent"). */
+export async function listRecentSaves(limit = 6): Promise<RecentSave[]> {
+  const { listSavesDetailed } = await import("./fileProject");
+  const infos = await listSavesDetailed().catch(() => []);
+  return infos
+    .slice(0, Math.max(limit, 1))
+    .map((info) => ({ ...info, current: info.name === currentSave }));
+}
+
 function nodeCountOf(json: string): number {
   try {
     const parsed = JSON.parse(json);
