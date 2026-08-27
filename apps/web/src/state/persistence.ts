@@ -258,19 +258,29 @@ export async function newProject(input?: string): Promise<string> {
   return clean;
 }
 
+export type SwitchSaveResult = { ok: true } | { ok: false; reason: string };
+
 /** Load a named save's latest file into the store and make it active. */
-export async function switchToSave(name: string): Promise<boolean> {
-  const raw = await readSaveFile(name);
-  if (raw === null) return false;
+export async function switchToSave(name: string): Promise<SwitchSaveResult> {
+  const raw = await readSaveFile(name).catch(() => null);
+  // An empty file means the folder was auto-created on read: this browser
+  // has no data for that save. (Storage is scoped per browser + origin, so
+  // saves made in another browser or under another host are simply absent.)
+  if (raw === null || raw.trim() === "") {
+    return {
+      ok: false,
+      reason: "no data for this save in this browser's storage",
+    };
+  }
   const result = tryLoad(raw);
-  if (!result.ok) return false;
+  if (!result.ok) return { ok: false, reason: result.reason };
   currentSave = name;
   lastWritten = raw;
   lastSnapshotJson = raw;
   pendingForceVersion = false;
   void registerSaveName(name);
   await setMeta("currentSave", name);
-  return true;
+  return { ok: true };
 }
 
 export function useAutosave(): void {

@@ -126,11 +126,12 @@ export function TopBar() {
 
   const openSave = async (name: string) => {
     if (name === currentSave) return;
-    if (await switchToSave(name)) {
+    const result = await switchToSave(name);
+    if (result.ok) {
       setCurrentSave(name);
       showToast(`Opened “${name}”.`);
     } else {
-      showToast(`Could not open “${name}”.`);
+      showToast(`Could not open “${name}” — ${result.reason}.`);
     }
   };
 

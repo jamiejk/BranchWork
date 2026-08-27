@@ -39,12 +39,13 @@ export function SaveModal({ onClose }: { onClose: () => void }) {
     if (target === current) return;
     setBusy(true);
     try {
-      if (await switchToSave(target)) {
+      const result = await switchToSave(target);
+      if (result.ok) {
         setCurrent(target);
         refresh();
         showToast(`Switched to "${target}".`);
       } else {
-        showToast(`"${target}" could not be loaded.`);
+        showToast(`"${target}" could not be loaded — ${result.reason}.`);
       }
     } finally {
       setBusy(false);
